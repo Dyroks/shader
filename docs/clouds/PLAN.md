@@ -13,7 +13,7 @@ Base du pack : SEUS PTGI HRR 2.1 GFME, Iris 1.11.7, Minecraft 26.3, Voxy.
 | 3 | Intégration : capture du ciel (GI, lumière ambiante du ciel, réflexions), ombres des nuages (terrain, GI, rayons de lumière) | ✅ testée en jeu (sauf : nuages vus depuis sous l'eau) |
 | 4 | Atmosphère Hillaire 2020 (tables précalculées), remplacement du ciel SEUS, option SEUS/Hillaire | ✅ testée en jeu (« beaucoup mieux que SEUS ») |
 | 5 | Variété : couches moyennes et hautes (Ac, As, Ci, Cs, Cc), cumulonimbus et enclume, régimes météo, éclairs | ✅ testée en jeu (« très bon », pas de problème) |
-| 6 | Accélération (révisée après mesures : saut hiérarchique des zones vides), intérieur et nuages proches | ✅ livrée, à tester |
+| 6 | Accélération (révisée après mesures : saut hiérarchique des zones vides), intérieur et nuages proches | ✅ testée en jeu (meilleures performances, intérieur des nuages bon) |
 | 7 | Optionnel : table de diffusion multiple précalculée par path tracing, bibliothèque de nuages simulés | ⏳ |
 
 Configuration de test de l'utilisateur : RTX 4080, 4K, Voxy, carte custom avec des montagnes d'environ 2000 blocs.
