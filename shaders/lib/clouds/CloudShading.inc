@@ -48,4 +48,16 @@ vec3 CloudShade(vec3 data, float depth, vec3 dir, float camY, vec3 sunVec, vec3 
 	#endif
 }
 
+// Average sky radiance over the upper hemisphere (lights the clouds). Meant for vertex
+// shaders: 17 SkyShading evaluations.
+vec3 CloudAverageSkyRadiance(vec3 sunVec) {
+	vec3 a = SkyShading(vec3(0.0, 1.0, 0.0), sunVec);
+	for (int i = 0; i < 8; i++) {
+		float an = float(i) * 0.785398;
+		a += SkyShading(normalize(vec3(cos(an), 0.25, sin(an))), sunVec);
+		a += SkyShading(normalize(vec3(cos(an + 0.39), 1.0, sin(an + 0.39))), sunVec);
+	}
+	return a / 17.0;
+}
+
 #endif

@@ -25,7 +25,9 @@ flat in vec3 colorSkyUp;
 #include "/lib/Common.inc"
 
 #ifdef VOLUMETRIC_CLOUDS
+flat in vec3 cloudSkyAmbient;
 #include "/lib/clouds/CloudLookups.inc"
+#include "/lib/clouds/CloudComposite.inc"
 #endif
 #include "/lib/Materials.inc"
 #include "/lib/GBufferData.inc"
@@ -436,7 +438,13 @@ vec2 Texcoord;
            {
              vec2 I=Y.xy*2.-1.;
              float V=smoothstep(.5,1.,max(abs(I.x),abs(I.y)));
-             vec3 colorTemp=mix(pow(texture2DLod(colortex1,DTY+HalfScreen.xy,0).xyz,vec3(2.2))*stainedColor*100.,N.xyz,vec3(V));
+             vec3 screenColor=pow(texture2DLod(colortex1,DTY+HalfScreen.xy,0).xyz,vec3(2.2))*100.;
+             #ifdef VOLUMETRIC_CLOUDS
+             // the sky on screen has no clouds yet (they are composited in composite4)
+             if(d>.5)
+               screenColor=CloudOverScreenSky(screenColor,normalize(L),DTY,cloudSkyAmbient,.1);
+             #endif
+             vec3 colorTemp=mix(screenColor*stainedColor,N.xyz,vec3(V));
              N=mix(N.xyz,colorTemp,saturate(weight-1.));
            }
        }

@@ -99,8 +99,16 @@ void main() {
 			valid = valid && !fresh;
 		#endif
 
+		// Exact per pixel occlusion: if this pixel's surface is closer than the entry of the cloud
+		// layer, no cloud can be seen whatever the history says (e.g. a wall moving in front)
+		float tStart, tEnd;
+		bool layerHit = CloudShellSegment(dir, cameraPosition.y, cloudLayerBottom, cloudLayerTop, tStart, tEnd);
+		bool occluded = !layerHit || CloudSceneDistance(px, tc, CloudJitter(frameCounter)) <= tStart;
+
 		vec4 result;
-		if (valid) {
+		if (occluded) {
+			result = vec4(0.0, 0.0, 1.0, 1.0);
+		} else if (valid) {
 			hist.xyz = clamp(hist.xyz, mn, mx);
 			if (fresh) {
 				float count = min(hist.w, cloudHistoryMax - 1.0);

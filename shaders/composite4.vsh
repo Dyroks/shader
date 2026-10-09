@@ -26,6 +26,8 @@ flat out vec3 colorSkyUp;
 
 #ifdef VOLUMETRIC_CLOUDS
 flat out vec3 cloudSkyAmbient;
+#include "/lib/clouds/CloudLookups.inc"
+#include "/lib/clouds/CloudShading.inc"
 #endif
 
 
@@ -40,13 +42,6 @@ void main()
 	colorSkyUp = SkyShading(vec3(0.0, 1.0, 0.0), worldSunVector);
 
 	#ifdef VOLUMETRIC_CLOUDS
-	// Average sky radiance over the upper hemisphere, lights the clouds
-	cloudSkyAmbient = colorSkyUp;
-	for (int i = 0; i < 8; i++) {
-		float a = float(i) * 0.785398;
-		cloudSkyAmbient += SkyShading(normalize(vec3(cos(a), 0.25, sin(a))), worldSunVector);
-		cloudSkyAmbient += SkyShading(normalize(vec3(cos(a + 0.39), 1.0, sin(a + 0.39))), worldSunVector);
-	}
-	cloudSkyAmbient /= 17.0;
+	cloudSkyAmbient = CloudAverageSkyRadiance(worldSunVector);   // lights the clouds
 	#endif
 }

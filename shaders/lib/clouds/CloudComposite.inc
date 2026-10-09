@@ -1,8 +1,9 @@
 // =====================================================================================
-//  Volumetric clouds - composition into the lit scene (composite4.fsh)
+//  Volumetric clouds - composition into the lit scene (composite4.fsh) and into the
+//  screen space sky reflections (composite.fsh)
 //
 //  Included after the pack's Settings/Uniforms/Common, so the SEUS atmosphere functions
-//  are available. Phase 4 will route this through a dedicated atmosphere interface.
+//  and the LOD helpers are available.
 // =====================================================================================
 
 #ifndef CLOUD_COMPOSITE_INC
@@ -31,15 +32,17 @@ vec3 CloudHeatColor(float x) {
 	return CloudSat(vec3(x * 3.0 - 1.0, x < 0.5 ? x * 2.0 : 2.0 - x * 2.0, 1.0 - x * 3.0)) + vec3(0.02);
 }
 
-// color   : scene colour in composite4 units (modified in place)
-// worldDir: normalised camera to pixel direction
-// tc      : internal texture coordinate (0..0.5)
-// skyAmbient: average sky radiance (deferred12 units)
-void CloudComposite(inout vec3 color, vec3 worldDir, vec2 tc, vec3 skyAmbient) {
-	ivec2 px = ivec2(tc * vec2(viewWidth, viewHeight));
-	vec4 hist = (frameCounter & 1) == 0 ? texelFetch(cloudHistASampler, px, 0) : texelFetch(cloudHistBSampler, px, 0);
+// History written by composite4_b this frame (latest = true, after composite4_b) or by the
+// previous frame (latest = false, for passes that run before composite4).
+vec4 CloudHistory(ivec2 px, bool latest) {
+	bool readA = ((frameCounter & 1) == 0) == latest;
+	vec4 hist = readA ? texelFetch(cloudHistASampler, px, 0) : texelFetch(cloudHistBSampler, px, 0);
 	if (any(isnan(hist)) || any(isinf(hist))) hist = vec4(0.0, 0.0, 1.0, 0.0);
+	return hist;
+}
 
+// Distance of the clouds seen through an internal pixel (blocks)
+float CloudDepthAt(ivec2 px) {
 	#if CLOUD_RES == 2
 		ivec2 rp = px >> 1;
 	#else
@@ -56,9 +59,50 @@ void CloudComposite(inout vec3 color, vec3 worldDir, vec2 tc, vec3 skyAmbient) {
 		}
 		if (depthKm <= 0.0) depthKm = 10.0 * cloudScale;
 	}
+	return depthKm * 1000.0;
+}
 
+// Distance to the first surface (terrain, water, LOD terrain) through an internal texture
+// coordinate, 1e9 for the sky
+float CloudSurfaceDistance(vec2 tc) {
+	float dist = 1e9;
+	float d = textureLod(depthtex0, tc, 0.0).x;
+	if (d < 1.0) dist = length(GetViewPosition(tc, d).xyz);
+	#ifdef LOD
+		float ld = min(getLodDepthSolid(tc), getLodDepthWater(tc));
+		if (ld < 1.0) dist = min(dist, length(GetViewPositionLod(tc, ld).xyz));
+	#endif
+	return dist;
+}
+
+// Clouds can only be visible if the view ray enters the cloud layer before the surface.
+// Exact per pixel test: removes any temporal leftover of clouds over near geometry.
+bool CloudPossible(vec3 worldDir, float surfaceDist) {
+	float tStart, tEnd;
+	if (!CloudShellSegment(worldDir, cameraPosition.y, cloudLayerBottom, cloudLayerTop, tStart, tEnd)) return false;
+	return surfaceDist > tStart;
+}
+
+// color   : scene colour in composite4 units (modified in place)
+// worldDir: normalised camera to pixel direction
+// tc      : internal texture coordinate (0..0.5)
+// skyAmbient: average sky radiance (deferred12 units)
+void CloudComposite(inout vec3 color, vec3 worldDir, vec2 tc, vec3 skyAmbient) {
+	ivec2 px = ivec2(tc * vec2(viewWidth, viewHeight));
+	#if CLOUD_DEBUG_VIEW != 2 && CLOUD_DEBUG_VIEW != 3
+		if (!CloudPossible(worldDir, CloudSurfaceDistance(tc))) {
+			#if CLOUD_DEBUG_VIEW == 1
+				color = vec3(0.0);
+			#elif CLOUD_DEBUG_VIEW == 4
+				color = vec3(2.0);
+			#endif
+			return;
+		}
+	#endif
+
+	vec4 hist = CloudHistory(px, true);
 	float T = CloudSat(hist.z);
-	vec3 cloudColor = CloudShade(hist.xyz, depthKm * 1000.0, worldDir, cameraPosition.y, worldSunVector, colorSunlight, skyAmbient);
+	vec3 cloudColor = CloudShade(hist.xyz, CloudDepthAt(px), worldDir, cameraPosition.y, worldSunVector, colorSunlight, skyAmbient);
 	cloudColor = DoNightEyeAtNight(cloudColor, timeMidnight);
 
 	#if CLOUD_DEBUG_VIEW == 0
@@ -74,10 +118,27 @@ void CloudComposite(inout vec3 color, vec3 worldDir, vec2 tc, vec3 skyAmbient) {
 			if (max(abs(uv.x - 0.5), abs(uv.y - 0.5)) < 0.004) color = vec3(4.0);
 		}
 	#elif CLOUD_DEBUG_VIEW == 3
+		#if CLOUD_RES == 2
+			ivec2 rp = px >> 1;
+		#else
+			ivec2 rp = px;
+		#endif
 		color = CloudHeatColor(texelFetch(cloudRawSampler, rp, 0).y) * 2.0;
 	#elif CLOUD_DEBUG_VIEW == 4
 		color = vec3(T) * 2.0;
 	#endif
+}
+
+// Screen space reflections that land on the sky read the sky drawn by deferred12, before
+// the clouds are composited (composite4). Put the clouds back, using the previous frame's
+// cloud history at that screen position.
+// skyColor: sky colour read from the screen (any unit), unitScale: that unit / deferred12 unit
+vec3 CloudOverScreenSky(vec3 skyColor, vec3 worldDir, vec2 tc, vec3 skyAmbient, float unitScale) {
+	ivec2 px = ivec2(tc * vec2(viewWidth, viewHeight));
+	vec4 hist = CloudHistory(px, false);
+	vec3 cloudColor = CloudShade(hist.xyz, CloudDepthAt(px), worldDir, cameraPosition.y, worldSunVector, colorSunlight, skyAmbient);
+	cloudColor = DoNightEyeAtNight(cloudColor, timeMidnight);
+	return skyColor * CloudSat(hist.z) + cloudColor * unitScale;
 }
 
 #endif
