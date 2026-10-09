@@ -22,7 +22,9 @@
 #define CLOUD_ALTITUDE 1500 // Altitude (absolute Y) of the base of low clouds. [150 200 250 300 350 400 450 500 600 700 800 900 1000 1100 1200 1300 1400 1500 1600 1800 2000 2250 2500 2750 3000 3500 4000]
 #define CLOUD_COVERAGE 0.5 // Average fraction of the sky covered by clouds. [0.0 0.05 0.1 0.15 0.2 0.25 0.3 0.35 0.4 0.45 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1.0]
 #define CLOUD_CONVECTION 0.55 // 0 = flat layered clouds, 1 = tall towering cumulus. [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0]
-#define CLOUD_EROSION 0.55 // Small scale erosion of cloud edges (cauliflower bulges at the top, wisps at the bottom). [0.0 0.1 0.2 0.3 0.4 0.5 0.55 0.6 0.7 0.8 0.9 1.0]
+#define CLOUD_EROSION 0.55 // Small scale detail: finest cauliflower lobes of cumulus, erosion of the edges of layered clouds (wisps at the bottom). [0.0 0.1 0.2 0.3 0.4 0.5 0.55 0.6 0.7 0.8 0.9 1.0]
+#define CLOUD_CUMULUS_MODEL 1 // Shape of cumulus clouds. 0 = previous (smooth rounded shapes), 1 = cauliflower lobes carved in a solid dome, crisp edges. [0 1]
+#define CLOUD_LOBES 1.0 // Cumulus (model 1): depth of the creases between the cauliflower lobes. [0.0 0.25 0.5 0.75 1.0 1.25 1.5 2.0]
 #define CLOUD_IRREGULARITY 1.0 // Distortion of cloud shapes and height variation of their tops (turrets). [0.0 0.25 0.5 0.75 1.0 1.25 1.5 2.0]
 #define CLOUD_DENSITY 1.0 // Optical density multiplier. [0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0 4.0]
 #define CLOUD_WEATHER_VARIATION 1.0 // How much coverage and cloud types vary across the sky and over time. [0.0 0.25 0.5 0.75 1.0 1.25 1.5]
@@ -42,6 +44,7 @@
 // ---- Lighting --------------------------------------------------------------------------
 #define CLOUD_AMBIENT 1.0 // Sky light received by clouds. [0.0 0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0]
 #define CLOUD_SUNLIGHT 1.0 // Sun light received by clouds. [0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0]
+#define CLOUD_LIGHT_MODEL 1 // Multiple scattering. 0 = previous (brighter, nearly uniform), 1 = calibrated on a path traced reference (shaded sides and bases darker, more contrast). [0 1]
 #define CLOUD_DEEP_DIFFUSION 0.4 // Sunlight diffusing deep inside clouds: lights their interior and shaded sides. 0 = previous look (darker, more contrast). [0.0 0.1 0.2 0.3 0.4 0.5 0.6]
 #define CLOUD_GROUND_BOUNCE 0.2 // Ground albedo used for light bounced from the ground onto cloud bases. 0 disables it. [0.0 0.1 0.2 0.3 0.4 0.5]
 #define CLOUD_AERIAL_PERSPECTIVE // Atmospheric haze between the camera and the clouds.

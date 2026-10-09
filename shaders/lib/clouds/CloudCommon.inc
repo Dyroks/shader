@@ -74,7 +74,7 @@ const float cloudSigmaT = 0.06 * CLOUD_DENSITY / CLOUD_SCALE;
 
 // Noise tiling periods (blocks)
 const float cloudBasePeriod   = 2000.0 * CLOUD_SCALE;  // 128^3 Perlin-Worley texture
-const float cloudDetailPeriod = 640.0 * CLOUD_SCALE;   // 32^3 Worley texture
+const float cloudDetailPeriod = 640.0 * CLOUD_SCALE;   // 64^3 Worley texture
 const float cloudCurlPeriod   = 2400.0 * CLOUD_SCALE;  // 128^2 curl texture (warp of detail / footprints)
 const float cloudMidPeriod    = 2400.0 * CLOUD_SCALE;  // base noise tiling for the altocumulus cloudlets
 const float cloudHighPeriod   = 36000.0 * CLOUD_SCALE; // 512^2 cirrus texture

@@ -91,8 +91,18 @@ option.CLOUD_COVERAGE=Couverture
 option.CLOUD_COVERAGE.comment=Fraction moyenne du ciel couverte par les nuages.
 option.CLOUD_CONVECTION=Convection
 option.CLOUD_CONVECTION.comment=0 = nuages plats en couches, 1 = cumulus hauts en tours.
+option.CLOUD_CUMULUS_MODEL=Forme des cumulus
+option.CLOUD_CUMULUS_MODEL.comment=Forme des cumulus. Précédente : formes arrondies et lisses. Chou-fleur : une masse pleine à base plate, creusée de lobes arrondis de plusieurs tailles, aux bords nets (la marche trouve la surface précisément).
+value.CLOUD_CUMULUS_MODEL.0=Précédente
+value.CLOUD_CUMULUS_MODEL.1=Chou-fleur
+option.CLOUD_LOBES=Lobes des cumulus
+option.CLOUD_LOBES.comment=Forme chou-fleur : profondeur des creux entre les lobes. Plus haut = plus irrégulier, plus bas = dômes plus lisses.
+option.CLOUD_LIGHT_MODEL=Modèle d'éclairage
+option.CLOUD_LIGHT_MODEL.comment=Diffusion multiple dans les nuages. Précédent : plus lumineux, presque uniforme (nuages souvent blancs partout). Calibré : ajusté sur une référence calculée par path tracing ; les faces opposées au soleil et les bases sont plus sombres, plus de contraste et de relief.
+value.CLOUD_LIGHT_MODEL.0=Précédent
+value.CLOUD_LIGHT_MODEL.1=Calibré
 option.CLOUD_EROSION=Érosion
-option.CLOUD_EROSION.comment=Érosion à petite échelle des bords (bosses en chou-fleur en haut, filaments en bas).
+option.CLOUD_EROSION.comment=Détail à petite échelle : plus petits lobes en chou-fleur des cumulus, érosion des bords des nuages en couches (filaments en bas).
 option.CLOUD_IRREGULARITY=Irrégularité
 option.CLOUD_IRREGULARITY.comment=Déformation des formes et variation de hauteur des sommets (tourelles).
 option.CLOUD_DENSITY=Densité

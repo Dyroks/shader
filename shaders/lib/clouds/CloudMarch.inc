@@ -32,10 +32,53 @@ struct CloudResult {
 // ---- Density ----------------------------------------------------------------------------
 // Convective clouds may rise up to this fraction above their nominal thickness (turrets)
 const float cloudTurretMax = 1.15;
-#ifndef CLOUD_DIFFUSION_DECAY
+// Multiple scattering model (see CloudMarch: octaves + diffusion term).
+// CLOUD_LIGHT_MODEL 1: fitted to a path traced reference (tools/cloud_reference.py: uniform
+// spheres of 250 and 600 m, droplet phase function, 5 view / sun configurations, mean error
+// ~20 %). The previous values were about twice too bright and nearly independent of the
+// orientation of the cloud surface to the sun (clouds looked uniformly white).
+#if CLOUD_LIGHT_MODEL == 0
 	#define CLOUD_DIFFUSION_DECAY 0.22
+	#define CLOUD_OCTAVE_B 0.4
+	#define CLOUD_DIFFUSE_W 0.85
+	#define CLOUD_DIFFUSE_G 0.3
+	#define CLOUD_DIFFUSE_GM 0.4
+#else
+	#define CLOUD_DIFFUSION_DECAY 0.26
+	#define CLOUD_OCTAVE_B 0.34
+	#define CLOUD_DIFFUSE_W 0.48
+	#define CLOUD_DIFFUSE_G 0.27
+	#define CLOUD_DIFFUSE_GM 1.0
 #endif
 
+// Erosion of a density field by billowy / wispy detail noise (layered clouds, anvils, previous
+// cumulus model). h: height in the cloud, nearDetail: adds a 4x finer octave.
+float CloudErodeDetail(float d, vec3 p, float h, float detailAmount, float nearDetail, vec3 detailOrigin) {
+	vec2 curl = (textureLod(cloudCurl, (detailOrigin.xz + p.xz) / cloudCurlPeriod, 0.0).rg - 0.5) * 2.0;
+	vec3 dp = detailOrigin + p + vec3(curl.x, 0.0, curl.y) * ((1.0 - h) * 140.0 * cloudScale);
+	vec3 dn = textureLod(cloudNoiseDetail, dp / cloudDetailPeriod, 0.0).rgb;
+	float hf = dn.r * 0.5 + dn.g * 0.3 + dn.b * 0.2;
+	float erosion = mix(hf, 1.0 - hf, CloudSat(h * 10.0));
+	d = CloudSat(CloudRemap(d, erosion * CLOUD_EROSION * detailAmount, 1.0, 0.0, 1.0));
+	if (nearDetail > 0.0 && d > 0.0) {
+		vec3 dn2 = textureLod(cloudNoiseDetail, dp * 4.0 / cloudDetailPeriod, 0.0).rgb;
+		float hf2 = dn2.g * 0.6 + dn2.b * 0.4;
+		float erosion2 = mix(hf2, 1.0 - hf2, CloudSat(h * 10.0));
+		d = CloudSat(CloudRemap(d, erosion2 * 0.6 * CLOUD_EROSION * nearDetail, 1.0, 0.0, 1.0));
+	}
+	return d;
+}
+
+// Minimum width of cloud edges (blocks), set by the ray march from its step length: edges much
+// sharper than the step only add noise
+float cloudEdgeMin = 0.0;
+// Signed distance to the surface of the last convective cloud evaluated by CloudDensity (blocks,
+// < 0 outside), 1e9 when unknown (layered clouds, anvils). Lets the ray march find cloud surfaces
+// precisely (sphere tracing) instead of within one step: crisp edges at any distance.
+float cloudSurfDist = 1e9;
+
+#if CLOUD_CUMULUS_MODEL == 0
+	#define CLOUD_PROBE_LOD 0
 // p: camera relative position, h: normalised height inside the cloud (0 base .. 1 top)
 // detailAmount: 0..1 detail erosion, 1..2 adds a finer octave for clouds close to the camera
 // lod 0: full density, lod 1: low frequency only (for distant light samples, which would
@@ -47,7 +90,7 @@ float CloudDensity(vec3 p, float h, CloudWeather w, float detailAmount, vec3 bas
 
 	// Cumulonimbus: type in 1..2 encodes the anvil, the body is the inner part of the
 	// footprint (radius anvilK in footprint units)
-	float type = w.type, anvilK = 1.0;
+	float type = max(w.type, 0.0), anvilK = 1.0;
 	if (type > 1.0) {
 		anvilK = max(2.0 - type, 0.2);
 		type = 1.0;
@@ -58,7 +101,7 @@ float CloudDensity(vec3 p, float h, CloudWeather w, float detailAmount, vec3 bas
 	//  - turrets: the local top height varies inside a cloud, so a big cumulus has several
 	//    towers of different heights instead of one smooth dome
 	//  - warp: bends the 3D noise so the bulges are not the regular round Worley cells
-	vec4 aux = textureLod(cloudCurl, (baseOrigin.xz + p.xz) / (2.6 * cloudKm) + vec2(0.31, 0.77), 0.0);
+	vec4 aux = textureLod(cloudCurl, (baseOrigin.xz + p.xz) / (2.0 * cloudKm) + vec2(0.31, 0.77), 0.0);
 	float turret = aux.b * 0.55 + aux.a * 0.45;
 	float topScale = mix(1.0, mix(0.6, cloudTurretMax, CloudSat(turret * 1.4 - 0.2)), type * min(CLOUD_IRREGULARITY, 1.0) * (1.0 - anvil));
 	h /= topScale;
@@ -140,8 +183,129 @@ float CloudDensity(vec3 p, float h, CloudWeather w, float detailAmount, vec3 bas
 	d *= mix(1.0, mix(0.5, 1.0, CloudSat(h * 2.5)), type);
 	d *= mix(1.0, 0.45, anvilPart);
 
-	return d * w.dens;
+	return d * mix(0.8, 1.2, bn.r);
 }
+
+#else
+	#define CLOUD_PROBE_LOD 2
+// p: camera relative position, h: normalised height inside the cloud (0 base .. 1 top)
+// detailAmount: 0..1 detail, 1..2 adds a finer octave for clouds close to the camera
+// lod 0: full density, lod 1: low frequency only (for distant light samples, which would
+// otherwise turn every small bulge into a long shadow streak), lod 2: > 0 anywhere a cloud
+// may be (envelope before carving: coarse search of the ray march, never misses thin parts)
+float CloudDensity(vec3 p, float h, CloudWeather w, float detailAmount, vec3 baseOrigin, vec3 detailOrigin, int lod) {
+	cloudSurfDist = 1e9;
+	if (w.cov <= 0.0) return 0.0;
+	float nearDetail = CloudSat(detailAmount - 1.0);
+	detailAmount = lod > 0 ? 0.0 : min(detailAmount, 1.0);
+
+	// Cumulonimbus: type in 1..2 encodes the anvil, the body is the inner part of the
+	// footprint (radius anvilK in footprint units)
+	float type = CloudSat(w.type), anvilK = 1.0;
+	if (w.type > 1.0) anvilK = max(2.0 - w.type, 0.2);
+	float anvil = CloudSat((1.0 - anvilK) * 4.0);
+	// weight of the cumulus shape (cloud cells), the rest is a layered cloud (type -1)
+	float wConv = CloudSat(1.0 + w.type * 2.0);
+
+	// Turrets: the local top height varies inside a cloud, so a big cumulus has several towers
+	// of different heights instead of one smooth dome (smooth field: fine 2D detail in the top
+	// height would draw vertical organ pipes)
+	float turret = textureLod(cloudCurl, (baseOrigin.xz + p.xz) / (6.0 * cloudKm) + vec2(0.53, 0.19), 0.0).a;
+	// Warp: bends the 3D noise so the lobes are not the regular round Worley cells (looked up
+	// on slanted planes: a purely 2D warp would extrude vertical streaks)
+	vec2 aux = textureLod(cloudCurl, (baseOrigin.xz + p.xz + (w.base + h * w.thick) * cloudKm * vec2(0.6, 0.35)) / (2.0 * cloudKm) + vec2(0.31, 0.77), 0.0).rg;
+	float topScale = mix(1.0, mix(0.6, 1.0, CloudSat(turret * 1.4 - 0.2)), type * min(CLOUD_IRREGULARITY, 1.0) * (1.0 - anvil));
+	h /= topScale;
+	if (h > 1.0) return 0.0;
+
+	vec2 warp = (aux - 0.5) * (2.0 * 160.0 * cloudScale * CLOUD_IRREGULARITY);
+	// wind shear: upper parts of clouds lean downwind
+	vec2 shear = CloudWindDir() * (h * w.thick * 0.18 * cloudKm);
+	vec3 bp = baseOrigin + p + vec3(warp.x + shear.x, (warp.x - warp.y) * 0.35, warp.y + shear.y);
+
+	// r: Perlin-Worley, gba: billowy Worley fBm (500, 250, 125 m cells)
+	vec4 bn = textureLod(cloudNoiseBase, bp / cloudBasePeriod, 0.0);
+	float lowFbm = lod == 1 ? bn.g : bn.g * 0.625 + bn.b * 0.25 + bn.a * 0.125;
+	float pert = (lowFbm - 0.5) * 0.5;
+	float cov = w.cov + pert;
+	float d = 0.0;
+
+	// ---- Convective clouds (cumulus, cumulonimbus body): a dome with a flat base, as a signed
+	// distance in blocks, carved by rounded lobes of several sizes (cauliflower). The lobes only
+	// carve inward: the cloud stays one solid mass inside its footprint, with crisp edges.
+	if (wConv > 0.0) {
+		float covBody = (w.cov - (1.0 - anvilK)) / anvilK;
+		float Rm = max(w.size, 0.03) * cloudKm;   // body radius
+		float Hm = max(w.thick * topScale, 0.03) * cloudKm;
+		float pe = mix(mix(2.6, 4.0, type), 5.0, anvil);
+		// distance to the axis (footprint units), the base is slightly rounded. The footprint is
+		// a 2D field: the 3D noise moves the sides inward so they are not extruded vertical walls.
+		float x = max(1.0 - covBody, 0.0) / (mix(0.93, 1.0, CloudSat(h * 8.0)) * mix(1.0, 0.8, bn.r));
+		float hp = pow(max(h, 1e-3), pe - 1.0);
+		float g = 1.0 - x * x - hp * h;
+		float sdf = g / max(length(vec2(2.0 * x / Rm, pe * hp / Hm)), 1e-7);
+		sdf = min(sdf, h * Hm);
+		if (lod == 2 && sdf > 0.0) return 1.0;
+
+		if (lod != 2) {
+			// lobes: Worley cells turned into paraboloids, deeper creases higher in the cloud
+			float sz = min(Rm, Hm) * mix(0.45, 1.0, smoothstep(0.0, 0.45, h)) * CLOUD_LOBES;
+			vec3 crease = (1.0 - bn.gba) * (1.0 - bn.gba);
+			float carve = crease.x * min(0.32 * sz, 280.0 * cloudScale);
+			if (lod == 0) {
+				carve += crease.y * min(0.2 * sz, 110.0 * cloudScale) + crease.z * min(0.15 * sz, 60.0 * cloudScale);
+				if (detailAmount > 0.0) {
+					vec3 dp = detailOrigin + p + vec3(warp.y, 0.0, warp.x) * 0.25;
+					vec3 dn = textureLod(cloudNoiseDetail, dp / cloudDetailPeriod, 0.0).rgb;
+					float c2 = 1.0 - (dn.g * 0.6 + dn.b * 0.4);
+					carve += c2 * c2 * min(0.12 * sz, 40.0 * cloudScale) * detailAmount * CLOUD_EROSION / 0.55;
+					if (nearDetail > 0.0) {
+						vec3 dn2 = textureLod(cloudNoiseDetail, dp * 4.0 / cloudDetailPeriod, 0.0).rgb;
+						float c3 = 1.0 - (dn2.g * 0.6 + dn2.b * 0.4);
+						carve += c3 * c3 * min(0.04 * sz, 10.0 * cloudScale) * nearDetail;
+					}
+				}
+			}
+			// edge: ~10 m close to the camera, wider far away (where the march is coarser)
+			float edge = max(mix(45.0, 9.0, detailAmount) * cloudScale, cloudEdgeMin);
+			float dc = CloudSat((sdf - carve) / edge);
+			if (wConv >= 1.0 && anvil <= 0.0) cloudSurfDist = sdf - carve;
+			// denser in the upper part (adiabatic liquid water)
+			dc *= mix(0.55, 1.0, CloudSat(h * 2.5));
+			d = dc;
+		}
+
+		// cumulonimbus anvil: smooth ice sheet spreading at the top
+		if (anvil > 0.0) {
+			float aRad = mix(anvilK, 1.0, smoothstep(0.68, 0.9, h)) * CloudSat((0.96 - h) * 30.0);
+			float envAnvil = CloudSat((cov - (1.0 - aRad)) * 4.0) * anvil * smoothstep(0.64, 0.74, h);
+			if (lod == 2 && envAnvil > 0.0) return 1.0;
+			float shapeA = max(CloudRemap(bn.r, lowFbm - 1.0, 1.0, 0.0, 1.0), 0.75);
+			float da = CloudSat(CloudRemap(shapeA, 1.0 - envAnvil, 1.0, 0.0, 1.0)) * envAnvil;
+			if (detailAmount > 0.0 && da > 0.0) da = CloudErodeDetail(da, p, h, detailAmount, nearDetail, detailOrigin);
+			d = max(d, CloudSat(da * 2.0) * 0.45);
+		}
+		d *= wConv;
+	}
+
+	// ---- Layered clouds (stratocumulus, stratus): a lumpy slab
+	if (wConv < 1.0) {
+		float shape = CloudRemap(bn.r, lowFbm - 1.0, 1.0, 0.0, 1.0);
+		if (lod > 0) shape = mix(shape, 0.6, 0.5);
+		shape = mix(shape, 0.7, 0.2);
+		float stratTop = 0.45 + 0.55 * CloudSat(cov * 1.6);   // thicker in the middle of a patch
+		float env = CloudSat(cov * 1.8) * CloudSat(h * 6.0) * CloudSat((stratTop - h) * 4.0);
+		if (lod == 2) return env;
+		float ds = CloudSat(CloudRemap(shape, 1.0 - env, 1.0, 0.0, 1.0)) * env;
+		if (detailAmount > 0.0 && ds > 0.0) ds = CloudErodeDetail(ds, p, h, detailAmount, nearDetail, detailOrigin);
+		d += CloudSat(ds * 2.0) * (1.0 - wConv);
+	}
+
+	if (lod == 2) return 0.0;
+	// liquid water varies inside clouds
+	return d * mix(0.8, 1.2, bn.r);
+}
+#endif
 
 // ---- Context ---------------------------------------------------------------------------
 struct CloudCtx {
@@ -156,8 +320,11 @@ struct CloudCtx {
 CloudCtx CloudMakeCtx(float time) {
 	CloudCtx c;
 	c.R = CloudGetSkyRegime();
-	c.baseOrigin   = mod(cameraPosition - CloudBaseNoiseOffset(time), vec3(cloudBasePeriod));
-	c.detailOrigin = mod(cameraPosition - CloudDetailNoiseOffset(time), vec3(cloudDetailPeriod));
+	// wrapped on a common multiple of the periods of every texture looked up with them
+	// (base noise 2 km, warp 2 km, turrets 6 km / detail noise 640 m, curl 2.4 km), else the
+	// shapes would jump when the camera or the wind crosses a wrap
+	c.baseOrigin   = mod(cameraPosition - CloudBaseNoiseOffset(time), vec3(cloudBasePeriod * 3.0));
+	c.detailOrigin = mod(cameraPosition - CloudDetailNoiseOffset(time), vec3(cloudDetailPeriod * 15.0));
 	c.midOrigin    = mod(cameraPosition - CloudMidNoiseOffset(time), vec3(cloudMidPeriod));
 	c.midWorld     = cameraPosition.xz - CloudWindOffset(time) * cloudMidWind;
 	c.highWorld    = cameraPosition.xz - CloudHighWindOffset(time);
@@ -346,7 +513,10 @@ float CloudDensityAt(vec3 p, float camY, float detailAmount, CloudCtx ctx, int l
 // first one short enough (~20-60 m) to self-shadow the cauliflower bulges.
 float CloudLightOpticalDepth(vec3 p, vec3 L, float camY, float jitter, float detailAmount, CloudCtx ctx) {
 	const float total = 2400.0 * CLOUD_SCALE;
-	const float ratio = 2.6;
+	#ifndef CLOUD_LIGHT_RATIO
+		#define CLOUD_LIGHT_RATIO 3.0
+	#endif
+	const float ratio = CLOUD_LIGHT_RATIO;
 	const float norm = total * (ratio - 1.0) / (pow(ratio, float(CQ_LIGHT_STEPS)) - 1.0);
 	float tau = 0.0, d = 0.0;
 	for (int i = 0; i < CQ_LIGHT_STEPS; i++) {
@@ -435,7 +605,7 @@ CloudResult CloudMarch(vec3 dir, float sceneDist, float camY, vec3 L, bool isSun
 		float phase[CQ_MS_OCTAVES];
 		for (int k = 0; k < CQ_MS_OCTAVES; k++) phase[k] = CloudPhase(cosTheta, exp2(-float(k)));
 		// Diffuse (high order) scattering lobe: mildly forward
-		float diffusePhase = mix(1.0, 4.0 * cloudPI * CloudPhaseHG(cosTheta, 0.3), 0.4) / cloudPI;
+		float diffusePhase = mix(1.0, 4.0 * cloudPI * CloudPhaseHG(cosTheta, CLOUD_DIFFUSE_G), CLOUD_DIFFUSE_GM) / cloudPI;
 
 		// Sun light reflected by the ground onto cloud bases (isotropic, ~half the ground shadowed)
 		float groundLight = CLOUD_GROUND_BOUNCE * max(L.y, 0.0) * 0.5 / cloudPI;
@@ -454,7 +624,8 @@ CloudResult CloudMarch(vec3 dir, float sceneDist, float camY, vec3 L, bool isSun
 		float t = tStart + CloudStepLength(tStart) * noise.x;
 		float tKnown = tStart;   // the ray is known to be empty before this distance
 		bool fine = false;
-		int empty = 0, samples = 0;
+		int samples = 0;
+		float emptyDist = 0.0;   // distance marched in fine mode without meeting a cloud
 		float overheadT = 1.0, overheadAt = -1e9;
 		float tileRetry = 0.0;
 		bool midOn = false;
@@ -474,8 +645,10 @@ CloudResult CloudMarch(vec3 dir, float sceneDist, float camY, vec3 L, bool isSun
 					#ifdef CLOUD_PROFILE
 						r.prof.x += 1.0;
 					#endif
-					t += hop;
-					tKnown = t;
+					// restart on a jittered position: a skip ends on a deterministic distance and
+					// the sample pattern would otherwise draw contour lines on the clouds
+					tKnown = t + hop;
+					t = tKnown + CloudStepLength(tKnown) * noise.x;
 					continue;
 				}
 			}
@@ -509,7 +682,9 @@ CloudResult CloudMarch(vec3 dir, float sceneDist, float camY, vec3 L, bool isSun
 				} else {
 					evalLow = true;
 					jump = stepT;
-					densLow = CloudDensity(p, hLow, w, detailAmount, ctx.baseOrigin, ctx.detailOrigin, 0);
+					// coarse search: only the envelope (cheap, cannot step over thin parts)
+					cloudEdgeMin = t * 0.002;
+					densLow = CloudDensity(p, hLow, w, detailAmount, ctx.baseOrigin, ctx.detailOrigin, fine ? 0 : CLOUD_PROBE_LOD);
 				}
 			}
 
@@ -536,6 +711,7 @@ CloudResult CloudMarch(vec3 dir, float sceneDist, float camY, vec3 L, bool isSun
 				#endif
 				t += jump;
 				tKnown = t;
+				if (jump > stepT) t += stepT * noise.x;   // jittered restart after a skip (see above)
 				fine = false;
 				continue;
 			}
@@ -548,8 +724,8 @@ CloudResult CloudMarch(vec3 dir, float sceneDist, float camY, vec3 L, bool isSun
 				if (dens > 0.0) {
 					// entering a cloud: step back and refine
 					fine = true;
-					empty = 0;
-					t = max(t - stepT * 0.6, tKnown);
+					emptyDist = 0.0;
+					t = max(t - stepT * 0.6, tKnown + stepT * 0.4 * noise.x);
 				} else {
 					t += stepT;
 				}
@@ -558,14 +734,29 @@ CloudResult CloudMarch(vec3 dir, float sceneDist, float camY, vec3 L, bool isSun
 
 			float dt = stepT * 0.4;
 			if (dens <= 0.0) {
-				if (++empty > 6) fine = false;
-				t += dt;
+				// outside a convective cloud: move toward its surface (the distance is only an
+				// estimate: lobes are not exact distances)
+				// The minimum step bounds the iterations of rays grazing a surface.
+				float st = dt;
+				if (!evalMid && cloudSurfDist < 0.0) {
+					// (jittered minimum step: where the first sample lands below the surface must not
+					// draw a pattern)
+					st = clamp(-cloudSurfDist * 0.75, max(t * 0.0015, dt * 0.12) * (0.5 + noise.x), dt);
+					tKnown = t + st;   // empty up to there: never step back over it
+				}
+				emptyDist += st;
+				if (emptyDist > dt * 6.5) fine = false;
+				t += st;
 				continue;
 			}
-			empty = 0;
+			emptyDist = 0.0;
 			samples++;
 
 			float sigma = dens * cloudSigmaT;
+			#ifndef CLOUD_TAU_STEP
+				#define CLOUD_TAU_STEP 99.0
+			#endif
+			dt = max(min(dt, CLOUD_TAU_STEP / sigma), stepT * 0.08);
 			float ext = exp(-sigma * dt);
 
 			// light blocked by the layers above (refreshed every few km along the ray)
@@ -592,15 +783,15 @@ CloudResult CloudMarch(vec3 dir, float sceneDist, float camY, vec3 L, bool isSun
 			for (int k = 0; k < CQ_MS_OCTAVES; k++) {
 				sun += a * phase[k] * exp(-tauL * b);
 				a *= 0.5;
-				b *= 0.4;
+				b *= CLOUD_OCTAVE_B;
 			}
-			float opticalSize = mix(w.thick * w.dens, thickMid * 0.5, wMid) * cloudKm * cloudSigmaT;
+			float opticalSize = mix(w.thick, thickMid * 0.5, wMid) * cloudKm * cloudSigmaT;
 			float diffuse = (1.0 - exp(-opticalSize * 0.12)) * CloudSat(dens * 4.0);
 			// Deep diffusion: in a nearly non absorbing medium the diffuse flux decays slowly with
 			// depth (diffusion theory: ~ 1 / (1 + 0.75 (1 - g) tau), g ~ 0.87). The exponential alone
 			// left the inside of clouds and their shaded sides far too dark.
 			float diffusion = mix(exp(-tauL * CLOUD_DIFFUSION_DECAY), 1.0 / (1.0 + 0.1 * tauL), CLOUD_DEEP_DIFFUSION);
-			sun += diffusePhase * diffusion * diffuse * 0.85;
+			sun += diffusePhase * diffusion * diffuse * CLOUD_DIFFUSE_W;
 			sun *= lightVis;
 			sun += groundLight * overheadT * CloudSat(1.0 - h) * CloudSat(1.0 - h);
 

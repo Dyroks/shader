@@ -5,9 +5,10 @@
 //    layer 0 : x = footprint (0 outside a cloud, 1 at the centre of a cloud)
 //              y = base altitude offset from CLOUD_ALTITUDE (scaled km)
 //              z = thickness (scaled km)
-//              w = cloud type (0 = flat layered cloud, 1 = towering convective cloud)
+//              w = cloud type: -1 = layered cloud (stratocumulus, stratus), 0..1 = cumulus from
+//                  flat (humilis) to towering (congestus)
 //    layer 1 : x = lower bound of the horizontal distance to the nearest cloud (scaled km)
-//              y = density multiplier of the cloud
+//              y = radius of the cloud (body of a cumulonimbus), scaled km
 //              z = highest cloud top within cloudSkipRadius (scaled km relative to CLOUD_ALTITUDE),
 //                  lets the ray march skip the empty space above the clouds
 //              w = mid level layer field (> 0 inside altocumulus / altostratus patches, its
@@ -29,9 +30,9 @@ struct CloudWeather {
 	float cov;    // footprint
 	float base;   // km (scaled) relative to CLOUD_ALTITUDE
 	float thick;  // km (scaled)
-	float type;   // 0 stratiform .. 1 convective
+	float type;   // -1 layered cloud, 0..1 cumulus (flat .. towering), > 1 cumulonimbus with anvil
 	float dist;   // km (scaled), lower bound of the distance to the closest cloud
-	float dens;   // density multiplier
+	float size;   // km (scaled), radius of the cloud (body of a cumulonimbus)
 	float maxTop; // km (scaled) relative to CLOUD_ALTITUDE, highest top within skipR
 	float skipR;  // km (scaled), horizontal radius over which maxTop is valid after filtering
 	float mid;    // mid layer field (> 0 inside a patch)
@@ -268,13 +269,15 @@ void CloudCells(vec2 q, vec4 warp, float L, int octave, float time, vec2 regimeO
 		dist = min(dist, edgeDist);
 
 		float type   = CloudSat(conv + (r2.x - 0.5) * 0.45);
-		float aspect = mix(0.55, 1.15, r2.y) * mix(0.55, 2.4, type);
-		float thick  = min(rad / cloudKm * aspect, cloudMaxThick);
+		float aspect = mix(0.75, 1.15, r2.y) * mix(1.0, 2.6, type);
+		// the depth of the convective layer bounds the thickness: wide clouds of weak convection
+		// are flat (stratocumulus like), only strong convection builds deep towers
+		float thick  = min(rad / cloudKm * aspect, mix(0.9, cloudMaxThick, type * type));
 		thick = mix(thick, cloudCbMaxThick * mix(0.82, 1.0, r3.w), cb);
 		// type > 1: anvil, body radius k = 2 - type in footprint units
 		type = cb > 0.0 ? 2.0 - bodyRad / outerRad : type;
 		float base   = reg.z + (r2.w - 0.5) * 0.12 - 0.05 * thick;
-		float dens   = mix(0.8, 1.2, fract(r2.x * 7.31 + r2.w));
+		float size   = bodyRad / cloudKm;
 
 		if (edgeDist < cloudSkipRadius * cloudKm) maxTop = max(maxTop, base + thick * 1.15);  // 1.15 = cloudTurretMax
 
@@ -287,12 +290,12 @@ void CloudCells(vec2 q, vec4 warp, float L, int octave, float time, vec2 regimeO
 			// (a half-anvil type would turn the whole footprint into a tall column)
 			if (f > cbF) {
 				cbF = f;
-				cbP = vec4(base, thick, type, dens);
+				cbP = vec4(base, thick, type, size);
 			}
 			continue;
 		}
 		float w = f > 0.0 ? f * f + 1e-3 : 1e-4 * (1.6 - qn);
-		acc  += w * vec4(base, thick, type, dens);
+		acc  += w * vec4(base, thick, type, size);
 		wsum += w;
 		if (f > 0.0) F = 1.0 - (1.0 - F) * (1.0 - f);
 	}
@@ -345,7 +348,7 @@ void CloudGenerateWeather(vec2 q, float time, bool far, out vec4 out0, out vec4 
 	}
 	if (fs > 0.0) {
 		float w = fs * fs + 1e-3;
-		acc  += w * vec4(reg.z + 0.12, thickS, 0.0, 1.0);
+		acc  += w * vec4(reg.z + 0.12, thickS, -1.0, 1.0);   // type -1: layered cloud
 		wsum += w;
 		F = 1.0 - (1.0 - F) * (1.0 - fs);
 	}
@@ -368,7 +371,7 @@ void CloudGenerateWeather(vec2 q, float time, bool far, out vec4 out0, out vec4 
 CloudWeather CloudUnpackWeather(vec4 a, vec4 b) {
 	CloudWeather w;
 	w.cov = a.x; w.base = a.y; w.thick = a.z; w.type = a.w;
-	w.dist = b.x; w.dens = b.y; w.maxTop = b.z;
+	w.dist = b.x; w.size = b.y; w.maxTop = b.z;
 	w.mid = b.w;
 	return w;
 }
@@ -384,7 +387,7 @@ CloudWeather CloudFilterMargin(CloudWeather w, float texelKm) {
 CloudWeather CloudMixWeather(CloudWeather a, CloudWeather b, float t) {
 	CloudWeather w;
 	w.cov = mix(a.cov, b.cov, t); w.base = mix(a.base, b.base, t); w.thick = mix(a.thick, b.thick, t);
-	w.type = mix(a.type, b.type, t); w.dist = min(a.dist, b.dist); w.dens = mix(a.dens, b.dens, t);
+	w.type = mix(a.type, b.type, t); w.dist = min(a.dist, b.dist); w.size = mix(a.size, b.size, t);
 	w.maxTop = max(a.maxTop, b.maxTop); w.skipR = min(a.skipR, b.skipR);
 	w.mid = mix(a.mid, b.mid, t); w.midDist = min(a.midDist, b.midDist);
 	return w;

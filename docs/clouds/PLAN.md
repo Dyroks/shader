@@ -14,7 +14,9 @@ Base du pack : SEUS PTGI HRR 2.1 GFME, Iris 1.11.7, Minecraft 26.3, Voxy.
 | 4 | Atmosphère Hillaire 2020 (tables précalculées), remplacement du ciel SEUS, option SEUS/Hillaire | ✅ testée en jeu (« beaucoup mieux que SEUS ») |
 | 5 | Variété : couches moyennes et hautes (Ac, As, Ci, Cs, Cc), cumulonimbus et enclume, régimes météo, éclairs | ✅ testée en jeu (« très bon », pas de problème) |
 | 6 | Accélération (révisée après mesures : saut hiérarchique des zones vides), intérieur et nuages proches | ✅ testée en jeu (meilleures performances, intérieur des nuages bon) |
-| 7 | Optionnel : table de diffusion multiple précalculée par path tracing, bibliothèque de nuages simulés | ⏳ |
+| 7 | Forme et éclairage des cumulus (retour : trop ronds, adoucis, blancs partout) : forme en chou-fleur, surface trouvée précisément, éclairage calibré sur une référence par path tracing, 2 bugs anciens corrigés | 🧪 à tester en jeu |
+
+La bibliothèque de nuages simulés (prévue en phase 7) est écartée : formes figées et répétitives (décision de l'utilisateur).
 
 Configuration de test de l'utilisateur : RTX 4080, 4K, Voxy, carte custom avec des montagnes d'environ 2000 blocs.
 Référence : 50-60 FPS à l'arrêt, environ 45 en mouvement, sans nuages.
@@ -50,6 +52,38 @@ Référence : 50-60 FPS à l'arrêt, environ 45 en mouvement, sans nuages.
 
 - **Test 3** : le fantôme sur les surfaces proches est corrigé. Les reflets au centre de l'écran fonctionnent à
   l'arrêt mais traînaient pendant les rotations : corrigé par la reprojection (à confirmer).
+
+## Phase 7 : forme et éclairage des cumulus
+
+**Retour de test** (capture comparée à une photo de cumulus) : nuages très ronds, très adoucis, blancs partout.
+Objectif : forme plus irrégulière mais d'un seul tenant (pas de morceaux détachés), plus de contraste, plus de détail.
+
+**Diagnostic** (outil d'aperçu, coupes verticales de la densité `--slice`, luminances linéaires `DUMP_LINEAR`) :
+- **Bug 1 (depuis la phase 1)** : après chaque saut d'espace vide, la marche reprenait à une distance déterministe et
+  perdait sa gigue. Les échantillons formaient des « courbes de niveau » sur les dômes et des rideaux verticaux sur les
+  flancs, que l'accumulation temporelle ne peut pas effacer. Corrigé : reprise sur une position tirée au hasard.
+- **Bug 2 (depuis la phase 2)** : le champ de déformation et de tourelles était lu avec l'origine du bruit de base, qui
+  boucle tous les 2 km, sur une texture de période 2,6 km. Les formes sautaient chaque fois que le vent (ou la caméra)
+  franchissait une boucle (toutes les ~3 min par 10 m/s). Corrigé : origines bouclées sur un multiple commun des
+  périodes (6 km et 9,6 km), déformation de période 2 km.
+- **Forme** : les cumulus de beau temps étaient des galettes lisses (ex. 440 × 120 m), de densité uniforme : l'empreinte
+  2D extrudée et un profil en dôme définissaient presque tout ; le bruit 3D ne faisait que flouter le bord (rampe de
+  densité sur ~45 % du rayon).
+- **Flou** : la surface n'était localisée qu'au pas de marche près (~34 m à 2 km, contre ~2 m par pixel en jeu).
+- **Éclairage** (référence par path tracing, `tools/cloud_reference.py`) : le modèle était environ **2 × trop lumineux**
+  et presque indépendant de l'orientation de la surface par rapport au soleil (zones à l'ombre 3 à 4 × trop claires).
+  Le terme de diffusion (85 % de la lumière) était isotrope et ne décroissait presque pas près de la surface. En jeu,
+  avec l'exposition réglée sur le ciel, tout le nuage tombait dans l'épaule de la courbe de tons : blanc partout.
+
+| Élément | Implémentation |
+|---|---|
+| **Forme chou-fleur** (`CLOUD_CUMULUS_MODEL` 1) | Distance signée en blocs à un dôme à base plate (profil x² + h^p, p de 2,6 à 4 selon la convection, 5 pour la colonne d'un cumulonimbus), calculée à partir de l'empreinte et du **rayon du nuage**, désormais stocké dans la carte météo (canal `layer1.y`, à la place du multiplicateur de densité). Creusée par des lobes arrondis (cellules de Worley mises en paraboloïdes) de 500, 250, 125 m et 80-20 m (+ 20-5 m près de la caméra), plus profonds en haut du nuage : on ne creuse que vers l'intérieur, le nuage reste une masse pleine dans son empreinte. Bord de ~10 m près de la caméra (plus large au loin). Les flancs sont déplacés en 3D (pas de murs extrudés). Champ de tourelles lissé (période 6 km) et déformation lue sur des plans inclinés : plus de « tuyaux d'orgue » verticaux. *Lobes des cumulus* règle la profondeur des creux. Les nuages en couches (stratocumulus) gardent l'ancien modèle ; type −1 dans la carte météo. Modèle 0 = forme précédente. |
+| **Proportions** | Épaisseur ≥ 0,75 × rayon (les cumulus humilis ne sont plus des galettes), bornée par la profondeur de la couche convective (0,9 km sans convection → 6 km en convection forte) : plus de blocs géants de 3,7 km d'épaisseur en régime de beau temps. |
+| **Surface précise** | La forme chou-fleur donne une distance à la surface : hors du nuage, la marche fine avance de cette distance (sphere tracing, pas min. ≈ 1 pixel). La recherche grossière n'évalue que l'enveloppe (moins chère, ne peut pas sauter une partie mince). Bords nets à toute distance, sans bruit supplémentaire. |
+| **Éclairage calibré** (`CLOUD_LIGHT_MODEL` 1) | Constantes ajustées (Nelder-Mead) sur 10 images de référence : sphères homogènes de 250 et 600 m, fonction de phase des gouttelettes (pic de diffraction 0,995 pour le transport), 5 configurations vue / soleil (face, côté, contre-jour, vu de dessous ×2). Terme de diffusion : poids 0,85 → 0,48, phase HG(0,27) au lieu d'un mélange presque isotrope ; octaves : atténuation 0,4 → 0,34 ; décroissance 0,22 → 0,26. Erreur moyenne 66 % → 20 %. Le contre-jour était déjà juste ; les faces éclairées de biais et les bases s'assombrissent. Reste : de face, le bord du disque reste trop clair (le modèle ignore l'épaisseur de nuage derrière le point). Modèle 0 = précédent. |
+| **Marche vers le soleil** | Premier pas ~20 m au lieu de ~33 m (raison géométrique 3,0 au lieu de 2,6, même longueur totale) : ombrage des petits lobes. |
+| **Bruit de détail** | Worley 64³ au lieu de 32³ (texels de 10 m au lieu de 20 m, 1 Mo) : petits lobes nets. |
+| **Coût** | Itérations mesurées : recherche grossière moins chère (enveloppe seule), +1 à 2 évaluations de densité par pixel pour approcher la surface. Temps CPU identique au bruit de mesure près (±15 %). À mesurer en jeu. |
 
 ## Phase 6 : accélération et intérieur des nuages
 
@@ -142,7 +176,7 @@ composite4.fsh   composition             couleurs du soleil et du ciel, perspect
 | `shaders/lib/atmosphere/Atmosphere.inc` | atmosphère physique : paramètres, paramétrisations des tables, intégration, ciel, perspective atmosphérique |
 | `shaders/lib/atmosphere/Sky.inc` | points d'entrée du pack (`SkyShading`, `SkyTransmittance`), aiguillage SEUS / physique |
 | `shaders/lib/atmosphere/AtmosphereSettings.inc` | options de l'atmosphère |
-| `shaders/textures/clouds/*.dat` | bruits 3D tuilables (Perlin-Worley 128³, Worley 32³, curl 128²) et texture de cirrus 512², générés par `tools/gen_cloud_noise.py` |
+| `shaders/textures/clouds/*.dat` | bruits 3D tuilables (Perlin-Worley 128³, Worley 64³, curl 128²) et texture de cirrus 512², générés par `tools/gen_cloud_noise.py` |
 
 ### Modèle de nuages
 
@@ -161,10 +195,13 @@ composite4.fsh   composition             couleurs du soleil et du ciel, perspect
   Les pas sont grossiers dans le vide et fins dans les nuages, avec un retour en arrière à l'entrée.
 - **Formes (phase 2)** : tourelles (sommet local de 0,6× à 1,15× l'épaisseur via un champ 2D), déformation du domaine
   du bruit de base, cisaillement du vent avec la hauteur, érosion de détail appliquée avant l'accentuation des bords.
+- **Cumulus (phase 7)** : dôme en distance signée creusé de lobes (chou-fleur), surface trouvée par sphere tracing ;
+  la densité aléatoire par nuage est remplacée par le rayon du nuage dans la carte météo. Voir la section Phase 7.
 - **Éclairage** :
   - fonction de phase « gouttelettes » : Henyey-Greenstein + Draine (Jendersie & d'Eon 2023), lobe avant élargi ;
   - diffusion d'ordres bas par octaves ;
-  - **terme de diffusion** en exp(−τ·(1−g)), qui rend le côté éclairé lumineux ;
+  - **terme de diffusion** en exp(−τ·(1−g)), qui rend le côté éclairé lumineux (constantes recalées en phase 7 sur une
+    référence par path tracing) ;
   - ciel selon la hauteur dans le nuage, et rebond du sol sous la base ;
   - intégration conservatrice d'énergie (Hillaire 2016) ;
   - (phase 2) couleur du soleil à l'altitude du nuage, avec moins d'atmosphère au-dessus et l'abaissement de l'horizon.
@@ -189,7 +226,10 @@ composite4.fsh   composition             couleurs du soleil et du ciel, perspect
 - Altostratus : les bords des plaques sont arrondis (aspect d'altocumulus floccus) plutôt qu'effilochés.
 - Pas de traînées de pluie (virga) sous les nuages ni de mammatus sous les enclumes.
 - Intérieur des nuages : brouillard uniforme (réaliste à l'intérieur d'un cumulus) ; près des bords, les détails
-  restent limités par la résolution de la marche vers le soleil (premier pas d'environ 30 m).
+  restent limités par la résolution de la marche vers le soleil (premier pas d'environ 20 m).
+- Éclairage calibré : de face (soleil dans le dos), le bord des nuages reste un peu trop clair et le centre un peu trop
+  sombre (erreur ~20-30 % sur ce cas) : il faudrait connaître l'épaisseur de nuage derrière chaque point.
+- Les grands nuages lointains (> 15 km) gardent parfois des stries verticales sur leurs flancs (empreinte 2D).
 
 ## Protocole de test en jeu
 
@@ -210,6 +250,11 @@ composite4.fsh   composition             couleurs du soleil et du ciel, perspect
    - S9 (phase 6) : FPS avec *Saut des zones vides* activé / désactivé, par ciel *Dégagé*, *Cumulus de beau temps* et
      vu d'avion (au-dessus de la couche) ; traverser un cumulus en vol (intérieur, entrée, sortie) ; *Diffusion
      profonde* 0 contre 0,4.
+   - S10 (phase 7) : `/time set 6000`, ciel *Cumulus de beau temps* puis *Cumulus bourgeonnants* : regarder un cumulus
+     d'en dessous (comme la capture), de côté à quelques km, et en vol tout près. Comparer *Forme des cumulus*
+     Précédente / Chou-fleur et *Modèle d'éclairage* Précédent / Calibré ; essayer *Lobes des cumulus* 0,5 à 1,5.
+     Vérifier : pas de formes qui sautent avec le vent (attendre quelques minutes), pas de bruit nouveau sur les bords.
+     FPS avec chaque combinaison.
    - S8 (phase 4) : comparer *Atmosphère* SEUS / Physique à midi, au coucher du soleil, au crépuscule (`/time set 12800`),
      la nuit, sous la pluie, depuis un sommet (brume sur le relief lointain de Voxy, qui doit se fondre dans le ciel à
      l'horizon) et en vol très haut. FPS SEUS contre Physique.
@@ -236,6 +281,12 @@ python3 tools/cloud_preview.py out.png --scene sunset --key 0.0011 -O ATMOSPHERE
 ATMO_DEBUG=dir python3 tools/cloud_preview.py out.png   # enregistre les tables de l'atmosphère (.npy)
 CLOUD_DUMP_WEATHER=dir python3 tools/cloud_preview.py out.png   # enregistre les cartes météo (.npy)
 PROF=1 python3 tools/cloud_preview.py out.png --frames 1   # itérations par catégorie (vide, grossier, fin, échantillons)
+python3 tools/cloud_preview.py out.png --yaw -32 --slice 1000 3500 1300 2300   # coupe verticale de la densité (+ paramètres météo)
+DUMP_LINEAR=img.npy python3 tools/cloud_preview.py out.png   # image linéaire + transmittance (.npy) pour mesurer les luminances
+python3 tools/cloud_preview.py out.png -D CLOUD_LIGHT_RATIO=3.2   # define supplémentaire (constantes internes)
+python3 tools/cloud_reference.py render 250 256 ref250.npz   # référence path tracing (sphère de 250 m, 256 spp, ~3 min)
+python3 tools/cloud_reference.py fit 250:ref250.npz,600:ref600.npz   # ajuste les constantes de l'éclairage
+python3 tools/cloud_reference.py compare 250:ref250.npz cmp.png   # précédent | référence | ajusté
 ```
 
 Dépendances : `glslang-tools`, `libegl1`, `libegl-mesa0` (apt) ; `numpy`, `pillow`, `moderngl` (pip).

@@ -5,7 +5,7 @@ Outputs raw binary textures (loaded by Iris through `customTexture.*` in
 shaders.properties) into shaders/textures/clouds/:
 
   noise_base.dat    128^3 RGBA8  R: Perlin-Worley  G,B,A: Worley fBm (4, 8, 16 cells/tile)
-  noise_detail.dat   32^3 RGBA8  R,G,B: Worley fBm (2, 4, 8 cells/tile)  A: Perlin fBm
+  noise_detail.dat   64^3 RGBA8  R,G,B: Worley fBm (2, 4, 8 cells/tile)  A: Perlin fBm
   curl.dat          128^2 RGBA8  RG: 2D curl of a tileable Perlin field (signed, 0.5 = 0)  B,A: Perlin fBm
   cirrus.dat        512^2 RGBA8  R: fine cirrus fibres  G: cirrocumulus grains  B: smooth veil  A: coarse cirrus fibres
                                  (fibres: line integral convolution of sparse noise along a flow mostly along +X)
@@ -13,7 +13,7 @@ shaders.properties) into shaders/textures/clouds/:
 Every texture tiles seamlessly (REPEAT wrap is enabled through .mcmeta files).
 The script is deterministic: re-running it produces identical files.
 
-Usage: python3 tools/gen_cloud_noise.py [--preview OUT_DIR]
+Usage: python3 tools/gen_cloud_noise.py [--preview OUT_DIR] [--cirrus-only] [--detail-only]
 """
 import os
 import sys
@@ -172,6 +172,11 @@ def main():
     if "--cirrus-only" in sys.argv:
         write("cirrus.dat", cirrus_texture())
         return
+    if "--detail-only" in sys.argv:
+        p = grid(64, 3)
+        write("noise_detail.dat", [normalize01(worley_fbm(p, 2, 400)), normalize01(worley_fbm(p, 4, 500)),
+                                   normalize01(worley_fbm(p, 8, 600)), normalize01(perlin_fbm(p, 2, 700, octaves=3))])
+        return
 
     print("base 128^3 ...")
     p = grid(128, 3)
@@ -181,8 +186,8 @@ def main():
     pw = normalize01(remap(pf, w0 - 1.0, 1.0, 0.0, 1.0))
     base = write("noise_base.dat", [pw, normalize01(w0), normalize01(worley_fbm(p, 8, 200)), normalize01(worley_fbm(p, 16, 300))])
 
-    print("detail 32^3 ...")
-    p = grid(32, 3)
+    print("detail 64^3 ...")
+    p = grid(64, 3)
     detail = write("noise_detail.dat", [normalize01(worley_fbm(p, 2, 400)), normalize01(worley_fbm(p, 4, 500)),
                                          normalize01(worley_fbm(p, 8, 600)), normalize01(perlin_fbm(p, 2, 700, octaves=3))])
 

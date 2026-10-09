@@ -91,8 +91,18 @@ option.CLOUD_COVERAGE=Coverage
 option.CLOUD_COVERAGE.comment=Average fraction of the sky covered by clouds.
 option.CLOUD_CONVECTION=Convection
 option.CLOUD_CONVECTION.comment=0 = flat layered clouds, 1 = tall towering cumulus.
+option.CLOUD_CUMULUS_MODEL=Cumulus Shape
+option.CLOUD_CUMULUS_MODEL.comment=Shape of cumulus clouds. Previous: smooth rounded shapes. Cauliflower: one solid mass with a flat base, carved by rounded lobes of several sizes, crisp edges (the ray march finds the surface precisely).
+value.CLOUD_CUMULUS_MODEL.0=Previous
+value.CLOUD_CUMULUS_MODEL.1=Cauliflower
+option.CLOUD_LOBES=Cumulus Lobes
+option.CLOUD_LOBES.comment=Cauliflower shape: depth of the creases between the lobes. Higher = more irregular, lower = smoother domes.
+option.CLOUD_LIGHT_MODEL=Light Model
+option.CLOUD_LIGHT_MODEL.comment=Multiple scattering inside clouds. Previous: brighter, nearly the same everywhere (clouds often look uniformly white). Calibrated: fitted to a path traced reference; sides facing away from the sun and cloud bases are darker, more contrast and depth.
+value.CLOUD_LIGHT_MODEL.0=Previous
+value.CLOUD_LIGHT_MODEL.1=Calibrated
 option.CLOUD_EROSION=Erosion
-option.CLOUD_EROSION.comment=Small scale erosion of cloud edges (cauliflower bulges at the top, wisps at the bottom).
+option.CLOUD_EROSION.comment=Small scale detail: finest cauliflower lobes of cumulus, erosion of the edges of layered clouds (wisps at the bottom).
 option.CLOUD_IRREGULARITY=Irregularity
 option.CLOUD_IRREGULARITY.comment=Distortion of cloud shapes and height variation of their tops (turrets).
 option.CLOUD_DENSITY=Density

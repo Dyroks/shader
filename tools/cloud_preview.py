@@ -172,6 +172,34 @@ void main() {
 """
 
 
+SLICE_SHADER = r"""#version 430
+layout(local_size_x = 8, local_size_y = 8) in;
+#include "/lib/Settings.inc"
+#define CLOUD_WEATHER_SAMPLING
+#include "/lib/clouds/CloudUniforms.inc"
+#include "/lib/clouds/CloudCommon.inc"
+#include "/lib/clouds/CloudWeather.inc"
+#include "/lib/clouds/CloudMarch.inc"
+layout(rgba32f) uniform writeonly image2D outImg;
+uniform vec4 sliceRange;   // t0, t1 (horizontal distance along the view yaw), y0, y1 (absolute altitude)
+uniform vec2 sliceDir;
+uniform float sliceDetail;
+uniform ivec2 sliceSize;
+void main() {
+	ivec2 px = ivec2(gl_GlobalInvocationID.xy);
+	if (any(greaterThanEqual(px, sliceSize))) return;
+	vec2 f = (vec2(px) + 0.5) / vec2(sliceSize);
+	float t = mix(sliceRange.x, sliceRange.y, f.x);
+	float y = mix(sliceRange.z, sliceRange.w, f.y);
+	vec3 p = vec3(sliceDir.x * t, y - cameraPosition.y, sliceDir.y * t);
+	CloudCtx ctx = CloudMakeCtx(CloudTime());
+	float d = CloudDensityAt(p, cameraPosition.y, sliceDetail, ctx, 0);
+	CloudWeather w = CloudSampleWeather(p.xz);
+	imageStore(outImg, px, vec4(d, w.size, w.thick, w.type));
+}
+"""
+
+
 def build_source(path_or_text, overrides, extra_defines, is_text=False):
     if is_text:
         tmp = os.path.join(SHADERS, "__preview_tmp.csh")
@@ -229,6 +257,10 @@ def main():
     ap.add_argument("--exposure", type=float, default=0.0, help="EV offset")
     ap.add_argument("--show-capture", action="store_true", help="insets: sky capture (left) and cloud shadow map (right)")
     ap.add_argument("-O", action="append", default=[], help="option override NAME=VALUE (see compile_check.py)")
+    ap.add_argument("--slice", type=float, nargs=4, metavar=("T0", "T1", "Y0", "Y1"),
+                    help="instead of rendering: density in the vertical plane along the view yaw (distances / altitudes in blocks)")
+    ap.add_argument("--slice-detail", type=float, default=1.0, help="detailAmount of the slice (2 = near camera octave)")
+    ap.add_argument("-D", action="append", default=[], help="extra define injected after #version (NAME or NAME=VALUE)")
     args = ap.parse_args()
 
     if args.scene:  # scene values are defaults: explicit flags win
@@ -259,7 +291,7 @@ def main():
         return t
 
     base = raw_tex3d("noise_base.dat", 128)
-    detail = raw_tex3d("noise_detail.dat", 32)
+    detail = raw_tex3d("noise_detail.dat", 64)
     curl = ctx.texture((128, 128), 4, np.fromfile(os.path.join(SHADERS, "textures", "clouds", "curl.dat"), dtype=np.uint8).tobytes(), dtype="f1")
     curl.repeat_x = curl.repeat_y = True
     curl.filter = (moderngl.LINEAR, moderngl.LINEAR)
@@ -328,7 +360,7 @@ def main():
     depthtex.filter = (moderngl.NEAREST, moderngl.NEAREST)
 
     # ---- programs ----------------------------------------------------------------------
-    extra = ["CLOUD_PROFILE"] if os.environ.get("PROF") else []
+    extra = (["CLOUD_PROFILE"] if os.environ.get("PROF") else []) + [d.replace("=", " ", 1) for d in args.D]
 
     def program(path):
         return ctx.compute_shader(build_source(os.path.join(SHADERS, path), overrides, extra))
@@ -410,6 +442,29 @@ def main():
         sk = np.frombuffer(skipMap.read(), dtype=np.float16).reshape(336, 256, 4).astype(np.float32)
         for name, blk in (("L1", sk[:256, :256]), ("L2", sk[256:320, :64]), ("L3", sk[320:336, :16])):
             print(f"PROF skip map {name}: empty tiles {np.mean(blk[..., 0] > 0) * 100:.0f} %")
+    if args.slice:
+        pSlice = ctx.compute_shader(build_source(SLICE_SHADER, overrides, extra, is_text=True))
+        common_uniforms(pSlice, 0)
+        set_u(pSlice, "sliceRange", tuple(args.slice))
+        yaw = math.radians(args.yaw)
+        set_u(pSlice, "sliceDir", (math.sin(yaw), -math.cos(yaw)))
+        set_u(pSlice, "sliceDetail", args.slice_detail)
+        set_u(pSlice, "sliceSize", (W, H))
+        out.bind_to_image(0, read=False, write=True)
+        run(pSlice, (W + 7) // 8, (H + 7) // 8)
+        d = np.frombuffer(out.read(), dtype=np.float32).reshape(H, W, 4)[..., 0]
+        print(f"slice density: max {d.max():.3f}  mean inside {d[d > 0].mean() if (d > 0).any() else 0:.3f}")
+        full = np.frombuffer(out.read(), dtype=np.float32).reshape(H, W, 4)
+        cols = np.where((d > 0).any(0))[0]
+        if len(cols):
+            # weather parameters along the slice where there are clouds (every ~8 % of the inside columns)
+            for c in cols[::max(len(cols) // 12, 1)]:
+                t = args.slice[0] + (c + 0.5) / W * (args.slice[1] - args.slice[0])
+                print(f"  t {t:7.0f}  size {full[0, c, 1]:.3f} km  thick {full[0, c, 2]:.3f} km  type {full[0, c, 3]:.2f}")
+        d = full[..., 0]
+        y = np.clip(d / max(d.max(), 1e-6), 0, 1) ** 0.5
+        Image.fromarray((y[::-1] * 255).astype(np.uint8)).save(args.out)
+        return
     # cloud shadow map, sky capture (4 frames to fill every texel of the checkerboard)
     common_uniforms(pShadow, 0)
     shadowMap.bind_to_image(0, read=False, write=True)
@@ -451,6 +506,8 @@ def main():
     run(pDisp, (W + 7) // 8, (H + 7) // 8)
     img = np.frombuffer(out.read(), dtype=np.float32).reshape(H, W, 4)[..., :3].astype(np.float64)
 
+    if os.environ.get("DUMP_LINEAR"):
+        np.save(os.environ["DUMP_LINEAR"], np.concatenate([img, acc[..., 2:3]], -1)[::-1].astype(np.float32))
     # simple auto exposure + filmic tone map
     lum = np.dot(img, [0.2126, 0.7152, 0.0722])
     key = np.exp(np.mean(np.log(np.maximum(lum, 1e-6)))) if args.key is None else args.key
