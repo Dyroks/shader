@@ -30,9 +30,7 @@ void main() {
 		float transmittance = 1.0;
 
 		if (L.y > 0.03) {
-			float time = CloudTime();
-			vec3 baseOrigin   = mod(cameraPosition - CloudBaseNoiseOffset(time), vec3(cloudBasePeriod));
-			vec3 detailOrigin = mod(cameraPosition - CloudDetailNoiseOffset(time), vec3(cloudDetailPeriod));
+			CloudCtx ctx = CloudMakeCtx(CloudTime());
 
 			vec2 xz = CloudShadowOrigin() + (vec2(id) + 0.5 - cloudShadowSize * 0.5) * cloudShadowTexel;
 			vec3 q = vec3(xz.x - cameraPosition.x, cloudShadowPlane - cameraPosition.y, xz.y - cameraPosition.z);
@@ -55,10 +53,30 @@ void main() {
 				}
 				float h = (alt - (cloudAltitude + w.base * cloudKm)) / (w.thick * cloudKm);
 				if (h >= 0.0 && h <= cloudTurretMax)
-					tau += CloudDensity(p, h, w, 0.0, baseOrigin, detailOrigin, 0) * stepT;
+					tau += CloudDensity(p, h, w, 0.0, ctx.baseOrigin, ctx.detailOrigin, 0) * stepT;
 				t += stepT;
 			}
+
+			// mid level layer: fixed number of steps across it
+			#if CLOUD_MID_LAYER > 0
+				if (ctx.R.mid > 0.0) {
+					float t0 = (cloudMidBottom - cloudShadowPlane) / L.y;
+					float t1 = min((cloudMidTop - cloudShadowPlane) / L.y, 40.0 * cloudKm);
+					float dtm = (t1 - t0) / 12.0;
+					for (int i = 0; i < 12; i++) {
+						vec3 p = q + L * (t0 + (float(i) + 0.5) * dtm);
+						CloudWeather w = CloudSampleWeather(p.xz);
+						if (w.mid <= 0.0) continue;
+						float hm, tm;
+						tau += CloudMidDensity(p, CloudAltitude(p, cameraPosition.y), w, ctx, 0.0, 0, hm, tm) * dtm;
+					}
+				}
+			#endif
 			tau *= cloudSigmaT;
+			// high clouds (thin, mostly forward scattering)
+			#if CLOUD_HIGH_LAYER > 0
+				tau += CloudHighTau(q.xz + L.xz * ((cloudHighAlt - cloudShadowPlane) / L.y), ctx, 0.0).x / L.y * 0.6;
+			#endif
 
 			// direct transmittance + light that diffused through the cloud (thin clouds and
 			// cloud edges let some light through, thick cumulus cast dark shadows)

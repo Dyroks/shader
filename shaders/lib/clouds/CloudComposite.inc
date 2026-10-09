@@ -13,6 +13,8 @@
 #define CLOUD_WORLDDAY_DECLARED
 uniform int worldDay;
 #endif
+uniform float thunderStrength;
+uniform vec4 lightningBoltPosition;   // camera relative, w = 1 while a bolt exists
 
 #include "/lib/clouds/CloudCommon.inc"
 #include "/lib/clouds/CloudShading.inc"
@@ -30,6 +32,40 @@ const float cloudToComposite = 0.12;
 vec3 CloudHeatColor(float x) {
 	x = CloudSat(x);
 	return CloudSat(vec3(x * 3.0 - 1.0, x < 0.5 ? x * 2.0 : 2.0 - x * 2.0, 1.0 - x * 3.0)) + vec3(0.02);
+}
+
+// Light of lightning flashes scattered by the clouds (deferred12 units). Applied here rather
+// than in the ray march so flashes are instant (no temporal accumulation).
+// cloudPos: camera relative position of the clouds seen by the pixel, T: their transmittance
+vec3 CloudLightning(vec3 cloudPos, float T) {
+	if (CLOUD_LIGHTNING <= 0.0 || (thunderStrength <= 0.0 && lightningBoltPosition.w < 0.5)) return vec3(0.0);
+	float flash = 0.0;
+
+	// the vanilla bolt: its channel lights the cloud base and the inside of the cloud above it
+	if (lightningBoltPosition.w > 0.5) {
+		vec3 b = lightningBoltPosition.xyz;
+		float top = cloudAltitude + 3.0 * cloudKm - cameraPosition.y;
+		vec3 d = cloudPos - vec3(b.x, clamp(cloudPos.y, b.y, top), b.z);
+		float flicker = 0.55 + 0.45 * CloudHash(ivec2(int(frameTimeCounter * 24.0), 7), 31).x;
+		flash += 1.5 * flicker * exp(-length(d) / (2.5 * cloudKm));
+	}
+
+	// flashes inside the storm clouds, at random places around the camera
+	const float slotLen = 0.8;   // seconds
+	float slot = floor(frameTimeCounter / slotLen);
+	vec4 h = CloudHash(ivec2(int(slot), 11), 4242);
+	if (h.x < thunderStrength * 0.12) {   // about one flash every 7 s
+		float tIn = frameTimeCounter - (slot + h.y * 0.5) * slotLen;
+		float dur = 0.12 + 0.25 * h.z;
+		if (tIn > 0.0 && tIn < dur) {
+			float strobe = CloudHash(ivec2(int(frameTimeCounter * 20.0), 13), 4243).x;
+			float az = h.w * 6.2831853;
+			float dist = mix(2.0, 20.0, fract(h.z * 7.31)) * cloudKm;
+			vec3 fp = vec3(cos(az) * dist, cloudAltitude + mix(1.0, 5.0, fract(h.y * 5.17)) * cloudKm - cameraPosition.y, sin(az) * dist);
+			flash += (0.35 + 0.65 * strobe) * exp(-length(cloudPos - fp) / (3.0 * cloudKm));
+		}
+	}
+	return vec3(0.72, 0.8, 1.0) * (6.0 * CLOUD_LIGHTNING * flash * (1.0 - T));
 }
 
 // History written by composite4_b this frame (latest = true, after composite4_b) or by the
@@ -102,8 +138,9 @@ void CloudComposite(inout vec3 color, vec3 worldDir, vec2 tc, vec3 skyAmbient) {
 
 	vec4 hist = CloudHistory(px, true);
 	float T = CloudSat(hist.z);
-	vec3 cloudColor = CloudShade(hist.xyz, CloudDepthAt(px), worldDir, cameraPosition.y, worldSunVector, colorSunlight, skyAmbient);
-	cloudColor = DoNightEyeAtNight(cloudColor, timeMidnight);
+	float depth = CloudDepthAt(px);
+	vec3 cloudColor = CloudShade(hist.xyz, depth, worldDir, cameraPosition.y, worldSunVector, colorSunlight, skyAmbient);
+	cloudColor = DoNightEyeAtNight(cloudColor, timeMidnight) + CloudLightning(worldDir * depth, T);
 
 	#if CLOUD_DEBUG_VIEW == 0
 		color = color * T + cloudColor * cloudToComposite;
@@ -158,7 +195,7 @@ vec3 CloudOverScreenSky(vec3 skyColor, vec3 worldDir, vec2 tc, vec3 skyAmbient, 
 	if (any(isnan(hist)) || any(isinf(hist))) return skyColor;
 
 	vec3 cloudColor = CloudShade(hist.xyz, depth, worldDir, cameraPosition.y, worldSunVector, colorSunlight, skyAmbient);
-	cloudColor = DoNightEyeAtNight(cloudColor, timeMidnight);
+	cloudColor = DoNightEyeAtNight(cloudColor, timeMidnight) + CloudLightning(worldDir * depth, CloudSat(hist.z));
 	return skyColor * CloudSat(hist.z) + cloudColor * unitScale;
 }
 

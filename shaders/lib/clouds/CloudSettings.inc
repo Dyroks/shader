@@ -31,6 +31,13 @@
 #define CLOUD_TIME_SOURCE 0 // 0 = world time (frozen if the daylight cycle is off, consistent between players), 1 = real time. [0 1]
 #define CLOUD_SEED 0 // Changes the whole cloud pattern. [0 1 2 3 4 5 6 7 8 9]
 
+// ---- Cloud types / weather ------------------------------------------------------------
+#define CLOUD_REGIME 0 // Kind of sky. 0 = changes every day, 1 = manual (only the settings of this menu), 2 = clear, 3 = fair weather cumulus, 4 = cumulus and altocumulus, 5 = cirrus, 6 = towering cumulus, 7 = stratocumulus, 8 = warm front (cirrostratus, altostratus), 9 = mixed. [0 1 2 3 4 5 6 7 8 9]
+#define CLOUD_MID_LAYER 100 // Amount of mid level clouds (altocumulus, altostratus), in %. 0 removes the layer (faster). [0 25 50 75 100 125 150 200]
+#define CLOUD_HIGH_LAYER 100 // Amount of high clouds (cirrus, cirrocumulus, cirrostratus), in %. 0 removes the layer. [0 25 50 75 100 125 150 200]
+#define CLOUD_STORMS // Cumulonimbus with anvils during thunderstorms (and rarely in convective weather).
+#define CLOUD_LIGHTNING 1.0 // Brightness of the lightning flashes inside clouds during thunderstorms. 0 = off. [0.0 0.5 1.0 1.5 2.0 3.0]
+
 // ---- Lighting --------------------------------------------------------------------------
 #define CLOUD_AMBIENT 1.0 // Sky light received by clouds. [0.0 0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0]
 #define CLOUD_SUNLIGHT 1.0 // Sun light received by clouds. [0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0]

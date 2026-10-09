@@ -7,6 +7,8 @@ shaders.properties) into shaders/textures/clouds/:
   noise_base.dat    128^3 RGBA8  R: Perlin-Worley  G,B,A: Worley fBm (4, 8, 16 cells/tile)
   noise_detail.dat   32^3 RGBA8  R,G,B: Worley fBm (2, 4, 8 cells/tile)  A: Perlin fBm
   curl.dat          128^2 RGBA8  RG: 2D curl of a tileable Perlin field (signed, 0.5 = 0)  B,A: Perlin fBm
+  cirrus.dat        512^2 RGBA8  R: fine cirrus fibres  G: cirrocumulus grains  B: smooth veil  A: coarse cirrus fibres
+                                 (fibres: line integral convolution of sparse noise along a flow mostly along +X)
 
 Every texture tiles seamlessly (REPEAT wrap is enabled through .mcmeta files).
 The script is deterministic: re-running it produces identical files.
@@ -110,8 +112,66 @@ def write(name, channels):
     return data
 
 
+def bilinear_wrap(img, x, y):
+    n = img.shape[0]
+    x0, y0 = np.floor(x).astype(np.int32), np.floor(y).astype(np.int32)
+    fx, fy = x - x0, y - y0
+    if img.ndim == 3:
+        fx, fy = fx[..., None], fy[..., None]
+    x0 %= n; y0 %= n
+    x1, y1 = (x0 + 1) % n, (y0 + 1) % n
+    return (img[x0, y0] * (1 - fx) * (1 - fy) + img[x1, y0] * fx * (1 - fy)
+            + img[x0, y1] * (1 - fx) * fy + img[x1, y1] * fx * fy)
+
+
+def lic(noise, flow, length, step=0.75):
+    """Line integral convolution (tileable): average of `noise` along the streamlines of `flow`."""
+    n = noise.shape[0]
+    xs, ys = np.meshgrid(np.arange(n, dtype=np.float32), np.arange(n, dtype=np.float32), indexing="ij")
+    acc = noise.copy()
+    wsum = np.ones_like(noise)
+    for sign in (1.0, -1.0):
+        x, y = xs.copy(), ys.copy()
+        for i in range(length):
+            v = bilinear_wrap(flow, x, y)
+            x = x + sign * step * v[..., 0]
+            y = y + sign * step * v[..., 1]
+            w = 1.0 - i / length  # tapered kernel: soft fibre ends
+            acc += bilinear_wrap(noise, x, y) * w
+            wsum += w
+    return acc / wsum
+
+
+def cirrus_texture(n=512):
+    p = grid(n, 2)
+    # flow: mostly along +X, bent by a large scale field (hooks, bundles of fibres)
+    ang = perlin_fbm(p, 2, 1100, octaves=2) * 0.5
+    flow = np.stack([np.cos(ang), np.sin(ang)], -1).astype(np.float32)
+    rng = np.random.default_rng(1200)
+    # sparse noise -> separate streaks instead of uniform grain
+    sparse = rng.random((n, n), dtype=np.float32) ** 6
+    sparse = 0.5 * sparse + 0.5 * bilinear_wrap(sparse, *np.meshgrid(np.arange(n) * 0.5, np.arange(n) * 0.5, indexing="ij"))
+    fine = normalize01(lic(sparse, flow, 80))
+    # strength of the fibres varies along them (cirrus filaments thin out and thicken)
+    fine = fine * (0.55 + 0.45 * normalize01(perlin_fbm(p, 8, 1300, octaves=3)))
+    sparse2 = rng.random((n // 4, n // 4), dtype=np.float32) ** 4
+    xs, ys = np.meshgrid(np.arange(n) / 4.0, np.arange(n) / 4.0, indexing="ij")
+    sparse2 = bilinear_wrap(sparse2, xs, ys)
+    coarse = normalize01(lic(sparse2, flow, 96, step=1.0))
+    # cirrocumulus: small grains in ripples
+    grains = 1 - worley(p, 48, 1400)
+    ripple = 0.5 + 0.5 * np.sin((p[..., 0] * 40 + perlin_fbm(p, 4, 1450, octaves=2) * 3.0) * 2 * np.pi)
+    cc = normalize01(grains * (0.6 + 0.4 * ripple))
+    veil = normalize01(perlin_fbm(p, 4, 1500, octaves=5))
+    return [normalize01(fine), cc, veil, coarse]
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
+
+    if "--cirrus-only" in sys.argv:
+        write("cirrus.dat", cirrus_texture())
+        return
 
     print("base 128^3 ...")
     p = grid(128, 3)
@@ -135,12 +195,17 @@ def main():
     write("curl.dat", [curl[..., 0] * 0.5 + 0.5, curl[..., 1] * 0.5 + 0.5,
                        normalize01(perlin_fbm(p, 8, 900, octaves=4)), normalize01(perlin_fbm(p, 2, 950, octaves=4))])
 
+    print("cirrus 512^2 ...")
+    cirrus = write("cirrus.dat", cirrus_texture())
+
     if "--preview" in sys.argv:
         from PIL import Image
         out_dir = sys.argv[sys.argv.index("--preview") + 1]
         Image.fromarray(base[0, :, :, :3]).save(os.path.join(out_dir, "noise_base_slice.png"))
         Image.fromarray(base[0, :, :, 3]).save(os.path.join(out_dir, "noise_base_slice_a.png"))
         Image.fromarray(detail[0, :, :, :3]).resize((128, 128), Image.NEAREST).save(os.path.join(out_dir, "noise_detail_slice.png"))
+        for k, name in enumerate("rgba"):
+            Image.fromarray(cirrus[:, :, k]).save(os.path.join(out_dir, f"cirrus_{name}.png"))
 
 
 if __name__ == "__main__":

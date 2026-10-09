@@ -51,8 +51,21 @@ const float cloudKm          = 1000.0 * CLOUD_SCALE;           // one "scaled ki
 const float cloudPlanetR     = 6360000.0 * CLOUD_SCALE;        // planet radius, follows the scale so the horizon looks the same
 const float cloudAltitude    = float(CLOUD_ALTITUDE);          // base of the low cloud layer (absolute Y)
 const float cloudLayerBottom = float(CLOUD_ALTITUDE) - 0.45 * cloudKm;
-const float cloudLayerTop    = float(CLOUD_ALTITUDE) + 6.5 * cloudKm;
-const float cloudMaxThick    = 6.0;                            // km (scaled), max thickness of a single cloud
+const float cloudLayerTop    = float(CLOUD_ALTITUDE) + 9.0 * cloudKm;   // cumulonimbus anvils
+const float cloudMaxThick    = 6.0;                            // km (scaled), max thickness of a cumulus
+const float cloudCbMaxThick  = 8.5;                            // km (scaled), cumulonimbus (base to anvil top)
+
+// Mid level layer (altocumulus / altostratus): every mid cloud lies between these heights
+// (scaled km above CLOUD_ALTITUDE). High layer (cirrus): thin sheet at cloudHighKm.
+const float cloudMidBottomKm = 1.8;
+const float cloudMidTopKm    = 4.4;
+const float cloudMidBottom   = float(CLOUD_ALTITUDE) + cloudMidBottomKm * cloudKm;
+const float cloudMidTop      = float(CLOUD_ALTITUDE) + cloudMidTopKm * cloudKm;
+const float cloudHighKm      = 8.0;
+const float cloudHighAlt     = float(CLOUD_ALTITUDE) + cloudHighKm * cloudKm;
+// Winds are stronger with height
+const float cloudMidWind     = 1.5;
+const float cloudHighWind    = 2.5;
 const float cloudMaxDistance = float(CLOUD_MAX_DISTANCE) * cloudKm;
 
 // Extinction of the densest part of a cloud, per block. ~0.06/m is a mean free path of ~16 m,
@@ -63,6 +76,8 @@ const float cloudSigmaT = 0.06 * CLOUD_DENSITY / CLOUD_SCALE;
 const float cloudBasePeriod   = 2000.0 * CLOUD_SCALE;  // 128^3 Perlin-Worley texture
 const float cloudDetailPeriod = 640.0 * CLOUD_SCALE;   // 32^3 Worley texture
 const float cloudCurlPeriod   = 2400.0 * CLOUD_SCALE;  // 128^2 curl texture (warp of detail / footprints)
+const float cloudMidPeriod    = 2400.0 * CLOUD_SCALE;  // base noise tiling for the altocumulus cloudlets
+const float cloudHighPeriod   = 36000.0 * CLOUD_SCALE; // 512^2 cirrus texture
 
 // Weather maps: near cascade 2048^2 texels, far cascade 1024^2 texels (2 layers each)
 const float cloudWeatherNearTexel = 48.0 * CLOUD_SCALE;
@@ -128,6 +143,17 @@ vec3 CloudBaseNoiseOffset(float time) {
 vec3 CloudDetailNoiseOffset(float time) {
 	vec2 w = CloudWindOffset(time) * (1.0 + 0.25 * CLOUD_EVOLUTION);
 	return vec3(w.x, 2.0 * CLOUD_SCALE * CLOUD_EVOLUTION * time, w.y);
+}
+
+vec3 CloudMidNoiseOffset(float time) {
+	vec2 w = CloudWindOffset(time) * (cloudMidWind + 0.1 * CLOUD_EVOLUTION);
+	return vec3(w.x, 0.4 * CLOUD_SCALE * CLOUD_EVOLUTION * time, w.y);
+}
+
+// High clouds: faster wind, veering by 25 degrees
+vec2 CloudHighWindOffset(float time) {
+	const float a = float(CLOUD_WIND_ANGLE + 25) * 0.01745329;
+	return vec2(cos(a), sin(a)) * (float(CLOUD_WIND_SPEED) * cloudHighWind * CLOUD_SCALE * time);
 }
 
 // ---- Planet geometry ------------------------------------------------------------------

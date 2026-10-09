@@ -92,17 +92,24 @@ DISPLAY_SHADER = r"""
 layout(local_size_x = 8, local_size_y = 8) in;
 #include "/lib/Settings.inc"
 
-uniform vec3 cameraPosition;
+uniform vec3 cameraPosition, previousCameraPosition;
 uniform mat4 gbufferModelViewInverse;
 uniform mat4 gbufferProjectionInverse;
+uniform mat4 gbufferPreviousModelView, gbufferPreviousProjection;
 uniform float viewWidth, viewHeight, frameTimeCounter, wetness, nightBrightness, timeMidnight;
 uniform int frameCounter, worldTime;
 uniform vec3 worldSunVector, worldLightVector, colorSunlight;
 uniform float sunAngle;
 uniform float groundY;
 layout(rgba32f) uniform writeonly image2D outImg;
+uniform sampler2D depthtex0;
 
 %SEUS%
+
+vec4 GetViewPosition(vec2 tc, float depth) {   // Common.inc, without the TAA jitter
+	vec4 p = gbufferProjectionInverse * vec4(tc * 4.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+	return p / p.w;
+}
 
 vec3 SkyAmbient() {
 	vec3 colorSkyUp = SkyShading(vec3(0.0, 1.0, 0.0), worldSunVector);
@@ -207,6 +214,10 @@ def main():
     ap.add_argument("--frames", type=int, default=6, help="frames accumulated")
     ap.add_argument("--time", type=float, default=6000, help="worldTime ticks (drives cloud motion)")
     ap.add_argument("--wetness", type=float, default=0.0)
+    ap.add_argument("--thunder", type=float, default=0.0, help="thunderStrength (cumulonimbus)")
+    ap.add_argument("--bolt", type=float, nargs=3, help="lightning bolt position (camera relative x y z)")
+    ap.add_argument("--frame-time", type=float, default=None, help="frameTimeCounter of the displayed frame (lightning timing)")
+    ap.add_argument("--day", type=int, default=0, help="worldDay (picks the sky regime when CLOUD_REGIME = 0)")
     ap.add_argument("--ground", type=float, default=64)
     ap.add_argument("--exposure", type=float, default=0.0, help="EV offset")
     ap.add_argument("--show-capture", action="store_true", help="insets: sky capture (left) and cloud shadow map (right)")
@@ -245,6 +256,9 @@ def main():
     curl = ctx.texture((128, 128), 4, np.fromfile(os.path.join(SHADERS, "textures", "clouds", "curl.dat"), dtype=np.uint8).tobytes(), dtype="f1")
     curl.repeat_x = curl.repeat_y = True
     curl.filter = (moderngl.LINEAR, moderngl.LINEAR)
+    cirrus = ctx.texture((512, 512), 4, np.fromfile(os.path.join(SHADERS, "textures", "clouds", "cirrus.dat"), dtype=np.uint8).tobytes(), dtype="f1")
+    cirrus.repeat_x = cirrus.repeat_y = True
+    cirrus.filter = (moderngl.LINEAR, moderngl.LINEAR)
     bn = np.array(Image.open(os.path.join(SHADERS, "textures", "blueNoiseRGB.png")).convert("RGBA"), dtype=np.uint8)
     noisetex = ctx.texture((64, 64), 4, bn.tobytes(), dtype="f1")
 
@@ -309,7 +323,7 @@ def main():
     disp_src = DISPLAY_SHADER.replace("%SEUS%", seus_sky_functions())
     pDisp = ctx.compute_shader(build_source(disp_src, overrides, [], is_text=True))
 
-    units = {"cloudNoiseBase": base, "cloudNoiseDetail": detail, "cloudCurl": curl, "noisetex": noisetex,
+    units = {"cloudNoiseBase": base, "cloudNoiseDetail": detail, "cloudCurl": curl, "cloudCirrus": cirrus, "noisetex": noisetex,
              "depthtex0": depthtex, "cloudRegimeSampler": regime, "cloudWeatherNearSampler": wNear, "cloudWeatherFarSampler": wFar,
              "cloudRawSampler": raw, "cloudHistASampler": histA, "cloudHistBSampler": histB,
              "cloudShadowSampler": shadowMap, "cloudSkyCaptureSampler": capture}
@@ -325,9 +339,10 @@ def main():
         set_u(p, "viewWidth", float(viewW)); set_u(p, "viewHeight", float(viewH))
         set_u(p, "frameTimeCounter", frame / 60.0)
         set_u(p, "wetness", args.wetness); set_u(p, "rainStrength", args.wetness)
-        set_u(p, "thunderStrength", 0.0)
+        set_u(p, "thunderStrength", args.thunder)
+        set_u(p, "lightningBoltPosition", tuple(args.bolt) + (1.0,) if args.bolt else (0.0, 0.0, 0.0, 0.0))
         set_u(p, "frameCounter", frame)
-        set_u(p, "worldTime", int(args.time)); set_u(p, "worldDay", 0)
+        set_u(p, "worldTime", int(args.time)); set_u(p, "worldDay", args.day)
         set_u(p, "worldSunVector", tuple(sun)); set_u(p, "worldLightVector", tuple(light))
         set_u(p, "sunAngle", 0.25 if sun[1] > 0 else 0.75)
         set_u(p, "colorSunlight", colorSunlight)
@@ -355,6 +370,8 @@ def main():
         img.bind_to_image(0, read=False, write=True)  # image uniforms are left at unit 0 (moderngl cannot rebind them)
         run(p, size // 16, size // 16)
         layer = np.frombuffer(img.read(), dtype=np.float16).reshape(2, size, size, 4)
+        if os.environ.get("CLOUD_DUMP_WEATHER"):
+            np.save(os.path.join(os.environ["CLOUD_DUMP_WEATHER"], f"weather{size}.npy"), layer.astype(np.float32))
         print(f"weather {size}: footprint>0 {np.mean(layer[0, ..., 0] > 0):.3f}  thick mean {layer[0, ..., 2].mean():.2f}  dist max {layer[1, ..., 0].max():.2f}")
     # cloud shadow map, sky capture (4 frames to fill every texel of the checkerboard)
     common_uniforms(pShadow, 0)
@@ -366,10 +383,14 @@ def main():
         run(pCapture, 32, 32)
     # rebind samplers after image use
     acc = np.zeros((H, W, 4), dtype=np.float64)
+    import time
+    march_time = 0.0
     for f in range(args.frames):
         common_uniforms(pMarch, f)
         raw.bind_to_image(0, read=False, write=True)
+        ctx.finish(); t0 = time.perf_counter()
         run(pMarch, (W + 7) // 8, (H + 7) // 8)
+        ctx.finish(); march_time += time.perf_counter() - t0
         r = np.frombuffer(raw.read(), dtype=np.float16).reshape(H, W, 4).astype(np.float64)
         acc += r
         print(f"frame {f + 1}/{args.frames}", end="\r", flush=True)
@@ -384,6 +405,8 @@ def main():
     histA.write(np.concatenate([acc[..., :3], np.ones_like(acc[..., :1])], -1).astype(np.float16).tobytes())
     raw.write(acc.astype(np.float16).tobytes())  # depth channel averaged: only used for haze
     common_uniforms(pDisp, 0)
+    if args.frame_time is not None:
+        set_u(pDisp, "frameTimeCounter", args.frame_time)
     set_u(pDisp, "showCapture", 1 if args.show_capture else 0)
     out.bind_to_image(0, read=False, write=True)
     run(pDisp, (W + 7) // 8, (H + 7) // 8)
@@ -404,6 +427,10 @@ def main():
         for name, ch in (("sun", 0), ("sky", 1), ("depthKm", 3)):
             v = acc[..., ch][m]
             print(f"{name}: p5 {np.percentile(v,5):.4f} p50 {np.percentile(v,50):.4f} p95 {np.percentile(v,95):.4f}")
+    if overrides.get("CLOUD_DEBUG_VIEW") == "3":
+        print(f"ray march cost: mean {acc[..., 1].mean():.4f} p95 {np.percentile(acc[..., 1], 95):.4f} (fraction of CQ_STEPS * 3 iterations)")
+    if os.environ.get("CLOUD_TIMING"):
+        print(f"march time per frame: {march_time / args.frames * 1000:.0f} ms (CPU renderer: only ratios are meaningful)")
     print(f"saved {args.out}  cloud cover (1-T mean): {1 - t.mean():.3f}  exposure key {key:.4g}")
 
 

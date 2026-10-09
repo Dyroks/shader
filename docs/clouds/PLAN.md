@@ -9,10 +9,10 @@ Base du pack : SEUS PTGI HRR 2.1 GFME, Iris 1.11.7, Minecraft 26.3, Voxy.
 |---|---|---|
 | 0 | Fondations : outils, textures de bruit, squelette Iris, menu, suppression des anciens nuages | ✅ testée en jeu |
 | 1 | Forme, météo, raymarching, reconstruction temporelle, composition | ✅ testée en jeu (OK avec Voxy, perte de FPS faible) |
-| 2 | Éclairage : phase, diffusion, ambiance, couleur du soleil à l'altitude, crépuscule, nuit + retours du test (formes moins rondes, bruit temporel) | ✅ livrée, à tester |
-| 3 | Intégration : capture du ciel (GI, lumière ambiante du ciel, réflexions), ombres des nuages (terrain, GI, rayons de lumière) | ✅ livrée, à tester (sauf : nuages vus depuis sous l'eau) |
-| 4 | Atmosphère Hillaire 2020 (tables précalculées), remplacement du ciel SEUS, option SEUS/Hillaire | ⏳ |
-| 5 | Variété : couches moyennes et hautes (Ac, As, Ci, Cs, Cc), cumulonimbus et enclume, régimes météo, éclairs | ⏳ |
+| 2 | Éclairage : phase, diffusion, ambiance, couleur du soleil à l'altitude, crépuscule, nuit + retours du test (formes moins rondes, bruit temporel) | ✅ testée en jeu |
+| 3 | Intégration : capture du ciel (GI, lumière ambiante du ciel, réflexions), ombres des nuages (terrain, GI, rayons de lumière) | ✅ testée en jeu (sauf : nuages vus depuis sous l'eau) |
+| 4 | Atmosphère Hillaire 2020 (tables précalculées), remplacement du ciel SEUS, option SEUS/Hillaire | ⏳ prochaine |
+| 5 | Variété : couches moyennes et hautes (Ac, As, Ci, Cs, Cc), cumulonimbus et enclume, régimes météo, éclairs | ✅ livrée, à tester |
 | 6 | Cache voxel + SDF, volume de lumière, intérieur des nuages simplifié, réglage des préréglages | ⏳ |
 | 7 | Optionnel : table de diffusion multiple précalculée par path tracing, bibliothèque de nuages simulés | ⏳ |
 
@@ -48,7 +48,31 @@ Référence : 50-60 FPS à l'arrêt, environ 45 en mouvement, sans nuages.
     reconstruction temporelle testent maintenant, pixel par pixel, si la surface est plus proche que l'entrée de la
     couche de nuages. Dans ce cas, aucun nuage n'est possible, quel que soit l'historique.
 
-## Architecture (phases 0-3)
+- **Test 3** : le fantôme sur les surfaces proches est corrigé. Les reflets au centre de l'écran fonctionnent à
+  l'arrêt mais traînaient pendant les rotations : corrigé par la reprojection (à confirmer).
+
+## Phase 5 : variété des nuages
+
+Ordre choisi par l'utilisateur : phase 5 avant la phase 4.
+
+| Élément | Implémentation |
+|---|---|
+| **Régimes de ciel** | `CloudGetSkyRegime` (`CloudWeather.inc`) : 8 types de ciel (dégagé, cumulus de beau temps, cumulus + altocumulus, cirrus, cumulus bourgeonnants, stratocumulus, front chaud, mixte). Option *Ciel* : change chaque jour (tirage pondéré par jour, transition de 13 h à minuit), manuel (réglages seuls), ou un type fixé. Chaque régime décale la couverture et la convection, dose les nuages en couche, les couches moyenne et haute, et la probabilité de cumulonimbus. La pluie ajoute un voile d'altostratus / nimbostratus ; l'orage le réduit et ajoute des cumulonimbus. |
+| **Apparition progressive** | Les cellules grandissent au lieu d'apparaître d'un coup quand la couverture change (rayon × √(marge d'occupation)). |
+| **Couche moyenne** (Ac / As) | Champ 2D signé dans le canal libre `layer1.w` des cartes météo (> 0 dans une plaque, sa partie négative donne une distance pour sauter le vide). Marchée dans la même boucle que les nuages bas : entre 1,8 et 4,4 km (× échelle) au-dessus de `CLOUD_ALTITUDE`, sauts limités à l'entrée de la couche, pas raccourcis dans les parties minces. Altocumulus : cellules de Worley étirées en rangées, aplaties ; altostratus : nappe lisse ondulée. La couche s'amincit en biseau vers le bord d'une plaque (pas de mur vertical). Vent ×1,5. Ombre analytique sur les nuages bas en dessous (`CloudOverheadTransmittance`). |
+| **Couche haute** (Ci / Cc / Cs) | Nappe mince analytique à `CLOUD_ALTITUDE` + 8 km (× échelle), une intersection par rayon, visible jusqu'à 2,5 × la distance max. Texture `cirrus.dat` 512² : fibres par convolution intégrale de ligne (LIC) d'un bruit épars le long d'un flot, grains de cirrocumulus, voile. Bandes allongées le long du vent d'altitude (×2,5, tourné de 25°). Phase des cristaux de glace avec halo de 22° dans les cirrostratus. Ombre légère sur les nuages et le terrain. |
+| **Cumulonimbus** | Uniquement par orage (ou rarement en régime « cumulus bourgeonnants »), sur les grandes cellules convectives : colonne jusqu'à 8,5 km et enclume (rayon ≈ 2,5 × la colonne) qui s'évase entre 68 et 90 % de la hauteur sous un sommet plat, avec un petit dôme de dépassement. Type > 1 = enclume (rayon de la colonne k = 2 − type). Les paramètres d'un cumulonimbus ne sont jamais moyennés avec ceux des nuages voisins (sinon des colonnes fines apparaissent sur le bord de l'enclume). |
+| **Éclairs** | `CloudLightning` (`CloudComposite.inc`), appliqué à la composition (instantané, hors accumulation temporelle) : éclair vanilla via `lightningBoltPosition` (canal lumineux du sol jusque dans le nuage, scintillement) + éclairs aléatoires à l'intérieur des nuages pendant les orages. |
+
+Correctif annexe : la déformation du domaine des empreintes de nuages était proportionnelle au rayon. Les grosses
+cellules se repliaient en étoile (bords déchirés, colonnes verticales). Elle est maintenant bornée par la longueur
+d'onde de chaque composante.
+
+Coût mesuré hors-jeu (rendu CPU, seuls les rapports comptent) : couche moyenne présente sur ~30 % du ciel ≈ +50 % de
+temps de raymarching par rapport aux seuls nuages bas ; couche haute ≈ gratuite ; orage ≈ +5 à 10 %. Les options
+*Nuages moyens* et *Nuages hauts* à 0 retirent le code correspondant.
+
+## Architecture (phases 0-3, complétée en phase 5)
 
 Le pack rend la scène à **demi-résolution** dans le quart bas-gauche de l'écran (HRR), puis son TAA (`composite7`)
 reconstruit la pleine résolution. Les buffers des nuages suivent cette grille « interne » : en 4K, l'interne fait 1920×1080.
@@ -79,7 +103,7 @@ composite4.fsh   composition             couleurs du soleil et du ciel, perspect
 | `shaders/lib/clouds/CloudShading.inc` | couleur des nuages à partir du raymarching (partagé par la composition et la capture du ciel) |
 | `shaders/lib/clouds/CloudSky.inc`, `CloudLookups.inc` | capture du ciel et carte d'ombre : encodage et lectures pour les passes du pack |
 | `shaders/lib/atmosphere/SkySEUS.inc` | fonctions de ciel SEUS, sorties de `Common.inc` pour être utilisables en compute (remplacées en phase 4) |
-| `shaders/textures/clouds/*.dat` | bruits 3D tuilables (Perlin-Worley 128³, Worley 32³, curl 128²), générés par `tools/gen_cloud_noise.py` |
+| `shaders/textures/clouds/*.dat` | bruits 3D tuilables (Perlin-Worley 128³, Worley 32³, curl 128²) et texture de cirrus 512², générés par `tools/gen_cloud_noise.py` |
 
 ### Modèle de nuages
 
@@ -116,7 +140,11 @@ composite4.fsh   composition             couleurs du soleil et du ciel, perspect
 - Les réflexions des nuages viennent de la capture 512² : elles sont un peu floues sur une eau très calme.
 - Les ombres des nuages couvrent environ ±16 km autour de la caméra (à l'échelle 1) et s'estompent quand le soleil est très bas.
 - La perspective atmosphérique SEUS suppose une caméra au sol. Les rayons vers le bas utilisent la direction miroir (phase 4).
-- Une seule couche basse/moyenne : pas encore de cirrus ni d'enclumes (phase 5).
+- `lightningBoltPosition` est supposée relative à la caméra (à vérifier en jeu : l'éclairage d'un éclair vanilla
+  doit se trouver au-dessus de l'impact).
+- Les cumulonimbus apparaissent avec l'orage en quelques secondes (montée de `thunderStrength`), pas en 30 minutes.
+- Altostratus : les bords des plaques sont arrondis (aspect d'altocumulus floccus) plutôt qu'effilochés.
+- Pas de traînées de pluie (virga) sous les nuages ni de mammatus sous les enclumes.
 - L'intérieur des nuages fonctionne, mais avec des pas grossiers près de la caméra (phase 6).
 
 ## Protocole de test en jeu
@@ -131,6 +159,10 @@ composite4.fsh   composition             couleurs du soleil et du ciel, perspect
    - S4 : voler au-dessus de la couche, puis à travers un nuage ;
    - S5 `/time set 18000` : nuit ;
    - S6 : les montagnes qui percent la couche (Voxy) — vérifier que les nuages passent bien **derrière** le relief lointain.
+   - S7 (phase 5) : *Ciel* sur chaque type fixé, à midi et au coucher du soleil ; puis *Change chaque jour* avec
+     `/time add 24000` plusieurs fois ; `/weather thunder` (cumulonimbus, enclumes, éclairs) ; voler au-dessus des
+     altocumulus (environ 4 km d'altitude à l'échelle 1, `CLOUD_ALTITUDE` + 2,7 km × échelle).
+   - FPS : comparer *Nuages moyens* 100 % et 0 %, en régime *Cumulus et altocumulus*.
 4. Vues de debug utiles pour les retours : *Nuages seuls*, *Coût* (rouge = coûteux), *Carte météo*.
 
 Points d'attention particuliers pour la première version :
@@ -146,6 +178,11 @@ python3 tools/gen_cloud_noise.py                      # régénère les textures
 python3 tools/compile_check.py                        # compile tous les programmes (glslangValidator)
 python3 tools/compile_check.py -D VOXY -O CLOUD_RES=1 # avec Voxy et une option forcée
 python3 tools/cloud_preview.py out.png --scene sunset # rendu hors-jeu des nuages (Mesa llvmpipe)
+python3 tools/cloud_preview.py out.png --scene noon -O CLOUD_REGIME=4      # un type de ciel fixé
+python3 tools/cloud_preview.py out.png --thunder 1 --wetness 0.5 --day 3   # orage, jour du monde
+python3 tools/cloud_preview.py out.png --sun -30 --thunder 1 --bolt 1500 -56 -6000   # éclair vanilla
+CLOUD_TIMING=1 python3 tools/cloud_preview.py out.png   # temps du raymarching (rapports seulement)
+CLOUD_DUMP_WEATHER=dir python3 tools/cloud_preview.py out.png   # enregistre les cartes météo (.npy)
 ```
 
 Dépendances : `glslang-tools`, `libegl1`, `libegl-mesa0` (apt) ; `numpy`, `pillow`, `moderngl` (pip).

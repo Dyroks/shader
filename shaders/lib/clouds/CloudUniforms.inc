@@ -39,6 +39,7 @@ uniform sampler2D noisetex;
 uniform sampler3D cloudNoiseBase;
 uniform sampler3D cloudNoiseDetail;
 uniform sampler2D cloudCurl;
+uniform sampler2D cloudCirrus;
 uniform sampler3D cloudWeatherNearSampler;
 uniform sampler3D cloudWeatherFarSampler;
 uniform sampler2D cloudRegimeSampler;

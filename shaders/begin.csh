@@ -24,6 +24,6 @@ void main() {
 		ivec2 id = ivec2(gl_GlobalInvocationID.xy);
 		float time = CloudTime();
 		vec2 q = CloudRegimeOrigin(time) + (vec2(id) + 0.5 - cloudRegimeSize * 0.5) * cloudRegimeTexel;
-		imageStore(cloudRegime, id, CloudRegimeFull(q, time));
+		imageStore(cloudRegime, id, CloudRegimeFull(q, time, CloudGetSkyRegime()));
 	#endif
 }
