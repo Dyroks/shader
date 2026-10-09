@@ -1,0 +1,46 @@
+{
+    "version": 1,
+    "uniforms": [
+        "far",
+        "wetness",
+        "fogColor",
+        "sunAngle",
+        "viewWidth",
+        "viewHeight",
+        "ScreenSize",
+        "ScreenTexel",
+        "frameCounter",
+        "isEyeInWater",
+        "rainStrength",
+        "cameraPosition",
+        "nightBrightness",
+        "frameTimeCounter",
+        "JitterSampleOffset",
+        "eyeBrightnessSmooth",
+        "gbufferModelView",
+        "gbufferModelViewInverse",
+        "gbufferProjection",
+        "gbufferProjectionInverse",
+        "vxRenderDistance",
+        "vxProj",
+        "vxProjInv"
+    ],
+    "samplers": {
+        "colortex4": "sampler2D",
+        "gaux2": "sampler2D",
+        "depthtex0": "sampler2D",
+        "depthtex1": "sampler2D",
+        "noisetex": "sampler2D",
+        "vxDepthTexOpaque": "sampler2D",
+        "vxDepthTexTrans": "sampler2D"
+    },
+    "blending": {
+        "-1": "off"
+    },
+    "excludeLodsFromVanillaDepth": true,
+    "taaOffset": "{return JitterSampleOffset;}",
+    "renderScale":[0.5, 0.5],
+    "useViewportDims": true,
+    "opaqueDrawBuffers": [0, 1, 2],
+    "translucentDrawBuffers": [17, 18]
+}
