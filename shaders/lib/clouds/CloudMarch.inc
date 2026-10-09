@@ -460,38 +460,52 @@ vec4 CloudHighLayer(vec3 dir, float sceneDist, float camY, vec3 L, bool isSun, C
 	return res;
 }
 
-// Light blocked by the mid and high layers above a point (when the light march does not
-// reach them). Broken altocumulus lets light through its gaps; thick decks transmit diffuse light.
-float CloudOverheadTransmittance(vec3 p, float alt, vec3 L, CloudCtx ctx) {
-	float T = 1.0;
-	if (L.y < 0.03) return T;
+// Light blocked by the mid and high layers above a point. Split in two:
+// CloudOverheadLookup (2D lookups, refreshed every few km along the view ray) and
+// CloudOverheadT (per sample). Low clouds always get the shadow of the mid layer from here
+// (the light march skips that layer for them: its few long steps sample a thin layer far too
+// coarsely), in proportion to the part of the layer above the sample, so it fades smoothly with
+// height. Broken altocumulus lets light through its gaps; thick decks transmit diffuse light.
+// Returns x: mid patch cover, y: mid type, z: high layer factor
+const float cloudMidShadowAlt = 2.6;    // scaled km above CLOUD_ALTITUDE, middle of the layer
+const float cloudMidShadowThick = 1.0;  // scaled km
+vec3 CloudOverheadLookup(vec3 p, float alt, vec3 L, CloudCtx ctx) {
+	vec3 o = vec3(0.0, 0.0, 1.0);
+	if (L.y < 0.03) return o;
 	#if CLOUD_MID_LAYER > 0
-		const float reach = 2400.0 * CLOUD_SCALE;   // length of the light march
-		if (ctx.R.mid > 0.0 && alt + reach * L.y < cloudMidBottom) {
-			float midAlt = cloudAltitude + 2.6 * cloudKm;
+		if (ctx.R.mid > 0.0) {
+			float midAlt = cloudAltitude + cloudMidShadowAlt * cloudKm;
 			CloudWeather w = CloudSampleWeather(p.xz + L.xz * ((midAlt - alt) / L.y));
-			float c = CloudSat(w.mid * 5.0);
-			if (c > 0.0) {
-				float type = CloudSat(ctx.R.midType + (w.mid - 0.2) * 0.8);
-				float tau = mix(8.0, 22.0, type) * c / L.y;
-				float e = exp(-tau);
-				float Td = e + (1.0 - e) * 0.45 / (1.0 + 0.15 * tau);
-				T *= 1.0 - c * mix(0.6, 1.0, type) * (1.0 - Td);
-			}
+			o.x = CloudSat(w.mid * 5.0);
+			o.y = CloudSat(ctx.R.midType + (w.mid - 0.2) * 0.8);
 		}
 	#endif
 	#if CLOUD_HIGH_LAYER > 0
 		if (alt < cloudHighAlt && ctx.R.high > 0.0) {
 			float tau = CloudHighTau(p.xz + L.xz * ((cloudHighAlt - alt) / L.y), ctx, 0.0).x / L.y;
-			T *= mix(1.0, exp(-tau), 0.4);   // mostly scattered forward: little light lost
+			o.z = mix(1.0, exp(-tau), 0.4);   // mostly scattered forward: little light lost
 		}
 	#endif
+	return o;
+}
+
+// lowSample: the sample belongs to a low / convective cloud (else to the mid layer, whose own
+// light march sees the layer)
+float CloudOverheadT(vec3 o, float alt, vec3 L, bool lowSample) {
+	float T = o.z;
+	if (lowSample && o.x > 0.0 && L.y >= 0.03) {
+		float above = CloudSat((cloudAltitude + (cloudMidShadowAlt + 0.5 * cloudMidShadowThick) * cloudKm - alt) / (cloudMidShadowThick * cloudKm));
+		float tau = mix(8.0, 22.0, o.y) * o.x * above / L.y;
+		float e = exp(-tau);
+		float Td = e + (1.0 - e) * 0.45 / (1.0 + 0.15 * tau);
+		T *= 1.0 - o.x * mix(0.6, 1.0, o.y) * (1.0 - Td);
+	}
 	return T;
 }
 
 
 // Density of all the marched layers at an arbitrary position (used by the light march)
-float CloudDensityAt(vec3 p, float camY, float detailAmount, CloudCtx ctx, int lod) {
+float CloudDensityAt(vec3 p, float camY, float detailAmount, CloudCtx ctx, int lod, bool withMid) {
 	CloudWeather w = CloudSampleWeather(p.xz);
 	float alt = CloudAltitude(p, camY);
 	float d = 0.0;
@@ -500,7 +514,7 @@ float CloudDensityAt(vec3 p, float camY, float detailAmount, CloudCtx ctx, int l
 		if (h >= 0.0 && h <= cloudTurretMax) d = CloudDensity(p, h, w, detailAmount, ctx.baseOrigin, ctx.detailOrigin, lod);
 	}
 	#if CLOUD_MID_LAYER > 0
-		if (w.mid > 0.0 && alt > cloudMidBottom && alt < cloudMidTop) {
+		if (withMid && w.mid > 0.0 && alt > cloudMidBottom && alt < cloudMidTop) {
 			float hm, tm;
 			d += CloudMidDensity(p, alt, w, ctx, lod == 0 ? detailAmount : 0.0, lod, hm, tm);
 		}
@@ -508,10 +522,15 @@ float CloudDensityAt(vec3 p, float camY, float detailAmount, CloudCtx ctx, int l
 	return d;
 }
 
+float CloudDensityAt(vec3 p, float camY, float detailAmount, CloudCtx ctx, int lod) {
+	return CloudDensityAt(p, camY, detailAmount, ctx, lod, true);
+}
+
 // ---- Lighting -----------------------------------------------------------------------------
 // Optical depth toward the light: geometrically growing steps over ~2.4 km (scaled), the
 // first one short enough (~20-60 m) to self-shadow the cauliflower bulges.
-float CloudLightOpticalDepth(vec3 p, vec3 L, float camY, float jitter, float detailAmount, CloudCtx ctx) {
+// withMid: include the mid layer (false for low cloud samples, see CloudOverheadT)
+float CloudLightOpticalDepth(vec3 p, vec3 L, float camY, float jitter, float detailAmount, CloudCtx ctx, bool withMid) {
 	const float total = 2400.0 * CLOUD_SCALE;
 	#ifndef CLOUD_LIGHT_RATIO
 		#define CLOUD_LIGHT_RATIO 3.0
@@ -523,7 +542,7 @@ float CloudLightOpticalDepth(vec3 p, vec3 L, float camY, float jitter, float det
 		float len = norm * pow(ratio, float(i));
 		vec3 sp = p + L * (d + len * jitter);
 		d += len;
-		tau += CloudDensityAt(sp, camY, i == 0 ? min(detailAmount, 1.0) : 0.0, ctx, i < 2 ? 0 : 1) * len;
+		tau += CloudDensityAt(sp, camY, i == 0 ? min(detailAmount, 1.0) : 0.0, ctx, i < 2 ? 0 : 1, withMid) * len;
 	}
 	return tau * cloudSigmaT;
 }
@@ -626,7 +645,8 @@ CloudResult CloudMarch(vec3 dir, float sceneDist, float camY, vec3 L, bool isSun
 		bool fine = false;
 		int samples = 0;
 		float emptyDist = 0.0;   // distance marched in fine mode without meeting a cloud
-		float overheadT = 1.0, overheadAt = -1e9;
+		vec3 overhead = vec3(0.0, 0.0, 1.0);
+		float overheadAt = -1e9;
 		float tileRetry = 0.0;
 		bool midOn = false;
 		#if CLOUD_MID_LAYER > 0
@@ -761,11 +781,13 @@ CloudResult CloudMarch(vec3 dir, float sceneDist, float camY, vec3 L, bool isSun
 
 			// light blocked by the layers above (refreshed every few km along the ray)
 			if (abs(t - overheadAt) > 3.0 * cloudKm) {
-				overheadT = CloudOverheadTransmittance(p, alt, L, ctx);
+				overhead = CloudOverheadLookup(p, alt, L, ctx);
 				overheadAt = t;
 			}
+			bool lowSample = densLow >= densMid;
+			float overheadT = CloudOverheadT(overhead, alt, L, lowSample);
 
-			float tauL = CloudLightOpticalDepth(p, L, camY, noise.y, detailAmount, ctx);
+			float tauL = CloudLightOpticalDepth(p, L, camY, noise.y, detailAmount, ctx, !lowSample);
 			// sun below the local horizon of this sample (dusk / dawn)
 			float lightVis = (isSun ? CloudSunVisibility(L.y, alt) : 1.0) * overheadT;
 
