@@ -282,6 +282,8 @@ def main():
         t.repeat_x = t.repeat_y = False
     regime = ctx.texture((512, 512), 4, dtype="f2")
     regime.filter = (moderngl.LINEAR, moderngl.LINEAR)
+    skipMap = ctx.texture((256, 336), 4, dtype="f2")
+    skipMap.filter = (moderngl.NEAREST, moderngl.NEAREST)
     shadowMap = ctx.texture((512, 512), 1, dtype="f2")
     shadowMap.filter = (moderngl.LINEAR, moderngl.LINEAR)
     capture = ctx.texture((512, 512), 4, dtype="f2")
@@ -326,12 +328,15 @@ def main():
     depthtex.filter = (moderngl.NEAREST, moderngl.NEAREST)
 
     # ---- programs ----------------------------------------------------------------------
+    extra = ["CLOUD_PROFILE"] if os.environ.get("PROF") else []
+
     def program(path):
-        return ctx.compute_shader(build_source(os.path.join(SHADERS, path), overrides, []))
+        return ctx.compute_shader(build_source(os.path.join(SHADERS, path), overrides, extra))
 
     pRegime, pBeginN, pBeginF = program("begin.csh"), program("begin_a.csh"), program("begin_b.csh")
     pMarch, pResolve = program("composite4_a.csh"), program("composite4_b.csh")
-    pShadow, pCapture = program("begin_c.csh"), program("begin_g.csh")
+    pShadow, pCapture = program("begin_h.csh"), program("begin_g.csh")
+    pSkip = program("begin_c.csh")
     pAtmoT, pAtmoMS, pAtmoSV = program("begin_d.csh"), program("begin_e.csh"), program("begin_f.csh")
     disp_src = DISPLAY_SHADER.replace("%SEUS%", seus_sky_functions())
     pDisp = ctx.compute_shader(build_source(disp_src, overrides, [], is_text=True))
@@ -339,7 +344,7 @@ def main():
     units = {"cloudNoiseBase": base, "cloudNoiseDetail": detail, "cloudCurl": curl, "cloudCirrus": cirrus, "noisetex": noisetex,
              "depthtex0": depthtex, "cloudRegimeSampler": regime, "cloudWeatherNearSampler": wNear, "cloudWeatherFarSampler": wFar,
              "cloudRawSampler": raw, "cloudHistASampler": histA, "cloudHistBSampler": histB,
-             "cloudShadowSampler": shadowMap, "cloudSkyCaptureSampler": capture,
+             "cloudShadowSampler": shadowMap, "cloudSkipSampler": skipMap, "cloudSkyCaptureSampler": capture,
              "atmoTransmittanceSampler": atmoT, "atmoMultiScatSampler": atmoMS, "atmoSkyViewSampler": atmoSV}
 
     def common_uniforms(p, frame):
@@ -398,6 +403,13 @@ def main():
         if os.environ.get("CLOUD_DUMP_WEATHER"):
             np.save(os.path.join(os.environ["CLOUD_DUMP_WEATHER"], f"weather{size}.npy"), layer.astype(np.float32))
         print(f"weather {size}: footprint>0 {np.mean(layer[0, ..., 0] > 0):.3f}  thick mean {layer[0, ..., 2].mean():.2f}  dist max {layer[1, ..., 0].max():.2f}")
+    common_uniforms(pSkip, 0)
+    skipMap.bind_to_image(0, read=False, write=True)
+    run(pSkip, 16, 16)
+    if os.environ.get("PROF"):
+        sk = np.frombuffer(skipMap.read(), dtype=np.float16).reshape(336, 256, 4).astype(np.float32)
+        for name, blk in (("L1", sk[:256, :256]), ("L2", sk[256:320, :64]), ("L3", sk[320:336, :16])):
+            print(f"PROF skip map {name}: empty tiles {np.mean(blk[..., 0] > 0) * 100:.0f} %")
     # cloud shadow map, sky capture (4 frames to fill every texel of the checkerboard)
     common_uniforms(pShadow, 0)
     shadowMap.bind_to_image(0, read=False, write=True)
@@ -415,7 +427,9 @@ def main():
         raw.bind_to_image(0, read=False, write=True)
         ctx.finish(); t0 = time.perf_counter()
         run(pMarch, (W + 7) // 8, (H + 7) // 8)
-        ctx.finish(); march_time += time.perf_counter() - t0
+        ctx.finish()
+        if f > 0 or args.frames == 1:  # the first dispatch includes the shader compilation (llvmpipe)
+            march_time += time.perf_counter() - t0
         r = np.frombuffer(raw.read(), dtype=np.float16).reshape(H, W, 4).astype(np.float64)
         acc += r
         print(f"frame {f + 1}/{args.frames}", end="\r", flush=True)
@@ -452,10 +466,15 @@ def main():
         for name, ch in (("sun", 0), ("sky", 1), ("depthKm", 3)):
             v = acc[..., ch][m]
             print(f"{name}: p5 {np.percentile(v,5):.4f} p50 {np.percentile(v,50):.4f} p95 {np.percentile(v,95):.4f}")
+    if os.environ.get("PROF"):
+        sky = acc[..., 0] + acc[..., 1] + acc[..., 2] + acc[..., 3] > 0
+        tot = acc[..., :4].sum(-1)
+        print("PROF iterations: p50 %.0f p90 %.0f max %.0f, at the cap (>= 215): %.1f %%" % (np.percentile(tot[sky], 50), np.percentile(tot[sky], 90), tot.max(), 100 * np.mean(tot[sky] >= 215)))
+        print("PROF per marched pixel: skip %.1f  coarse %.1f  fine-empty %.1f  samples %.1f  (pixels %d)" % tuple(list(acc[sky].mean(0)) + [sky.sum()]))
     if overrides.get("CLOUD_DEBUG_VIEW") == "3":
         print(f"ray march cost: mean {acc[..., 1].mean():.4f} p95 {np.percentile(acc[..., 1], 95):.4f} (fraction of CQ_STEPS * 3 iterations)")
     if os.environ.get("CLOUD_TIMING"):
-        print(f"march time per frame: {march_time / args.frames * 1000:.0f} ms (CPU renderer: only ratios are meaningful)")
+        print(f"march time per frame: {march_time / max(args.frames - 1, 1) * 1000:.0f} ms (CPU renderer: only ratios are meaningful)")
     print(f"saved {args.out}  cloud cover (1-T mean): {1 - t.mean():.3f}  exposure key {key:.4g}")
 
 

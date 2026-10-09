@@ -11,9 +11,9 @@ Base du pack : SEUS PTGI HRR 2.1 GFME, Iris 1.11.7, Minecraft 26.3, Voxy.
 | 1 | Forme, météo, raymarching, reconstruction temporelle, composition | ✅ testée en jeu (OK avec Voxy, perte de FPS faible) |
 | 2 | Éclairage : phase, diffusion, ambiance, couleur du soleil à l'altitude, crépuscule, nuit + retours du test (formes moins rondes, bruit temporel) | ✅ testée en jeu |
 | 3 | Intégration : capture du ciel (GI, lumière ambiante du ciel, réflexions), ombres des nuages (terrain, GI, rayons de lumière) | ✅ testée en jeu (sauf : nuages vus depuis sous l'eau) |
-| 4 | Atmosphère Hillaire 2020 (tables précalculées), remplacement du ciel SEUS, option SEUS/Hillaire | ✅ livrée, à tester |
+| 4 | Atmosphère Hillaire 2020 (tables précalculées), remplacement du ciel SEUS, option SEUS/Hillaire | ✅ testée en jeu (« beaucoup mieux que SEUS ») |
 | 5 | Variété : couches moyennes et hautes (Ac, As, Ci, Cs, Cc), cumulonimbus et enclume, régimes météo, éclairs | ✅ testée en jeu (« très bon », pas de problème) |
-| 6 | Cache voxel + SDF, volume de lumière, intérieur des nuages simplifié, réglage des préréglages | ⏳ |
+| 6 | Accélération (révisée après mesures : saut hiérarchique des zones vides), intérieur et nuages proches | ✅ livrée, à tester |
 | 7 | Optionnel : table de diffusion multiple précalculée par path tracing, bibliothèque de nuages simulés | ⏳ |
 
 Configuration de test de l'utilisateur : RTX 4080, 4K, Voxy, carte custom avec des montagnes d'environ 2000 blocs.
@@ -50,6 +50,22 @@ Référence : 50-60 FPS à l'arrêt, environ 45 en mouvement, sans nuages.
 
 - **Test 3** : le fantôme sur les surfaces proches est corrigé. Les reflets au centre de l'écran fonctionnent à
   l'arrêt mais traînaient pendant les rotations : corrigé par la reprojection (à confirmer).
+
+## Phase 6 : accélération et intérieur des nuages
+
+**Mesures avant de coder** (outil d'aperçu, `PROF=1`, rendu CPU : seuls les ordres de grandeur comptent) :
+- la marche vers le soleil ne représente que 10 à 20 % du temps : le « volume de lumière » prévu au plan n'aurait
+  presque rien fait gagner. **Abandonné.**
+- par pixel, l'essentiel des itérations sert à traverser du vide : 40 à 64 sauts (de 0,6 km au plus, la borne du
+  champ de distance 2D), contre quelques échantillons dans les nuages. Même par ciel totalement dégagé : 46
+  itérations par pixel. Vu de haut, 8 % des rayons atteignaient le plafond d'itérations (nuages lointains coupés).
+
+| Élément | Implémentation |
+|---|---|
+| **Carte de saut hiérarchique** (`CLOUD_SKIP_MAP`) | `begin_c.csh` : à partir de la carte météo lointaine, 3 niveaux de tuiles (1,6 / 6,4 / 25,6 km × échelle) avec la distance minimale au nuage, le sommet le plus haut et la couche moyenne. Le rayon franchit d'un coup la plus grande tuile où il ne peut rencontrer aucun nuage compte tenu de sa plage d'altitude (planète courbe). Une tuile fine occupée n'est pas re-testée avant d'en sortir. Résultat : ciel dégagé 46 → 4 itérations par pixel, cumulus épars −15 à −35 %, rayons au plafond 7,7 → 4,3 %. Image identique (vérifiée pixel à pixel), sauf des nuages lointains qui ne sont plus coupés. Le gain réel sur GPU est à mesurer en jeu (option activable). La carte d'ombre devient `begin_h`. |
+| **Diffusion profonde** (`CLOUD_DEEP_DIFFUSION`, 0,4) | Le terme de diffusion décroissait en exp(−0,22 τ), bien trop vite : dans un milieu qui n'absorbe presque pas, le flux diffus décroît en ~1 / (1 + 0,75 (1 − g) τ). Mélange des deux. L'intérieur d'un cumulus ensoleillé devient un « lait » gris-blanc au lieu d'un brouillard bleu sombre ; faces à l'ombre un peu plus claires. 0 = rendu précédent. |
+| **Nuages proches** | Pas de 15 m au lieu de 60 m dans les 250 premiers mètres (bords nets en entrant et en sortant d'un nuage) ; octave d'érosion 4 × plus fine (détails de 20 à 80 m) à moins de ~1,5 km : silhouettes nettes et filaments au lieu d'un bord flou. |
+| **Préréglages** | Inchangés : sans mesure GPU, je ne les retouche pas à l'aveugle. À ajuster d'après les FPS en jeu. |
 
 ## Phase 4 : atmosphère physique
 
@@ -99,7 +115,8 @@ reconstruit la pleine résolution. Les buffers des nuages suivent cette grille �
 begin.csh        carte régime 512²       couverture / convection / altitude de base / regroupement (très basse fréquence)
 begin_a.csh      météo proche 2048²×2    cellules de nuages (3 tailles de grilles : 9 / 3,5 / 1,4 km)
 begin_b.csh      météo lointaine 1024²×2 + couche stratiforme, distance au nuage le plus proche, sommet max local
-begin_c.csh      carte d'ombre 512²     transmittance des nuages le long de la lumière, sur le plan du bas de la couche (64 m/texel)
+begin_c.csh      carte de saut          3 niveaux de tuiles vides / sommet max / couche moyenne (phase 6)
+begin_h.csh      carte d'ombre 512²     transmittance des nuages le long de la lumière, sur le plan du bas de la couche (64 m/texel)
 begin_d..f.csh   atmosphère             tables de transmittance, diffusion multiple, vue du ciel (phase 4)
 begin_g.csh      capture du ciel 512²   ciel + nuages en carte octaédrique, ¼ des texels mis à jour par image, marche basse qualité
    ...           (passes du pack)
@@ -171,7 +188,8 @@ composite4.fsh   composition             couleurs du soleil et du ciel, perspect
 - Les cumulonimbus apparaissent avec l'orage en quelques secondes (montée de `thunderStrength`), pas en 30 minutes.
 - Altostratus : les bords des plaques sont arrondis (aspect d'altocumulus floccus) plutôt qu'effilochés.
 - Pas de traînées de pluie (virga) sous les nuages ni de mammatus sous les enclumes.
-- L'intérieur des nuages fonctionne, mais avec des pas grossiers près de la caméra (phase 6).
+- Intérieur des nuages : brouillard uniforme (réaliste à l'intérieur d'un cumulus) ; près des bords, les détails
+  restent limités par la résolution de la marche vers le soleil (premier pas d'environ 30 m).
 
 ## Protocole de test en jeu
 
@@ -189,6 +207,9 @@ composite4.fsh   composition             couleurs du soleil et du ciel, perspect
      `/time add 24000` plusieurs fois ; `/weather thunder` (cumulonimbus, enclumes, éclairs) ; voler au-dessus des
      altocumulus (environ 4 km d'altitude à l'échelle 1, `CLOUD_ALTITUDE` + 2,7 km × échelle).
    - FPS : comparer *Nuages moyens* 100 % et 0 %, en régime *Cumulus et altocumulus*.
+   - S9 (phase 6) : FPS avec *Saut des zones vides* activé / désactivé, par ciel *Dégagé*, *Cumulus de beau temps* et
+     vu d'avion (au-dessus de la couche) ; traverser un cumulus en vol (intérieur, entrée, sortie) ; *Diffusion
+     profonde* 0 contre 0,4.
    - S8 (phase 4) : comparer *Atmosphère* SEUS / Physique à midi, au coucher du soleil, au crépuscule (`/time set 12800`),
      la nuit, sous la pluie, depuis un sommet (brume sur le relief lointain de Voxy, qui doit se fondre dans le ciel à
      l'horizon) et en vol très haut. FPS SEUS contre Physique.
@@ -214,6 +235,7 @@ CLOUD_TIMING=1 python3 tools/cloud_preview.py out.png   # temps du raymarching (
 python3 tools/cloud_preview.py out.png --scene sunset --key 0.0011 -O ATMOSPHERE_MODEL=0   # exposition fixe, ciel SEUS
 ATMO_DEBUG=dir python3 tools/cloud_preview.py out.png   # enregistre les tables de l'atmosphère (.npy)
 CLOUD_DUMP_WEATHER=dir python3 tools/cloud_preview.py out.png   # enregistre les cartes météo (.npy)
+PROF=1 python3 tools/cloud_preview.py out.png --frames 1   # itérations par catégorie (vide, grossier, fin, échantillons)
 ```
 
 Dépendances : `glslang-tools`, `libegl1`, `libegl-mesa0` (apt) ; `numpy`, `pillow`, `moderngl` (pip).

@@ -15,6 +15,7 @@
 #define CLOUD_STEP_SCALE 1.0 // [Custom] Ray march step length multiplier (lower = finer = slower). [0.5 0.6 0.7 0.8 0.9 1.0 1.25 1.5 1.75 2.0]
 #define CLOUD_MAX_DISTANCE 120 // Maximum cloud render distance in km (scaled by Cloud Scale). [40 60 80 100 120 160 200 300]
 #define CLOUD_TEMPORAL // Temporal accumulation (reduces noise, may ghost slightly in fast motion).
+#define CLOUD_SKIP_MAP // Hierarchical empty space skipping (tiles of 1.6 / 6.4 / 25.6 km): rays cross empty areas in one step.
 
 // ---- World / look ---------------------------------------------------------------------
 #define CLOUD_SCALE 1.0 // Size of everything related to the clouds and the physical atmosphere. 1.0 = real world scale (cumulus about 1 km wide). Lower for vanilla-sized worlds. Rendering stays identical at every scale. [0.1 0.15 0.2 0.25 0.3 0.35 0.4 0.45 0.5 0.6 0.7 0.8 0.9 1.0 1.25 1.5 2.0]
@@ -41,6 +42,7 @@
 // ---- Lighting --------------------------------------------------------------------------
 #define CLOUD_AMBIENT 1.0 // Sky light received by clouds. [0.0 0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0]
 #define CLOUD_SUNLIGHT 1.0 // Sun light received by clouds. [0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0]
+#define CLOUD_DEEP_DIFFUSION 0.4 // Sunlight diffusing deep inside clouds: lights their interior and shaded sides. 0 = previous look (darker, more contrast). [0.0 0.1 0.2 0.3 0.4 0.5 0.6]
 #define CLOUD_GROUND_BOUNCE 0.2 // Ground albedo used for light bounced from the ground onto cloud bases. 0 disables it. [0.0 0.1 0.2 0.3 0.4 0.5]
 #define CLOUD_AERIAL_PERSPECTIVE // Atmospheric haze between the camera and the clouds.
 

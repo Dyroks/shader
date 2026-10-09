@@ -53,6 +53,9 @@ void main() {
 		#if CLOUD_DEBUG_VIEW == 3
 			outv.y = r.cost / float(CQ_STEPS * 3);
 		#endif
+		#ifdef CLOUD_PROFILE
+			outv = r.prof;
+		#endif
 		imageStore(cloudRaw, rp, outv);
 	#endif
 }

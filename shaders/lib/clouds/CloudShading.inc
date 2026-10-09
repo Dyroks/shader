@@ -1,7 +1,7 @@
 // =====================================================================================
 //  Volumetric clouds - colour of the clouds from the ray march output
 //
-//  Shared by the composition (composite4.fsh) and the sky capture (begin_d.csh).
+//  Shared by the composition (composite4.fsh) and the sky capture (begin_g.csh).
 //  Needs CloudCommon.inc, lib/atmosphere/Sky.inc, and the uniforms wetness,
 //  nightBrightness.
 // =====================================================================================

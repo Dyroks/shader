@@ -1,10 +1,10 @@
 // =====================================================================================
 //  Volumetric clouds - sky capture and cloud shadow map
 //
-//  cloudSkyCapture (begin_d.csh): sky + clouds radiance for every direction, octahedral map
+//  cloudSkyCapture (begin_g.csh): sky + clouds radiance for every direction, octahedral map
 //    (512^2, y up). rgb = radiance in SkyShading units, a = cloud transmittance (to hide
 //    the sun disc behind clouds). Used by the GI, the sky ambient (SH) and the reflections.
-//  cloudShadow (begin_c.csh): transmittance of the clouds along the light, stored on the
+//  cloudShadow (begin_h.csh): transmittance of the clouds along the light, stored on the
 //    horizontal plane of the cloud layer bottom, centred on the camera.
 //
 //  Lookups only need cameraPosition and worldLightVector (or an explicit light vector).

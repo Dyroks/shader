@@ -43,3 +43,4 @@ uniform sampler2D cloudCirrus;
 uniform sampler3D cloudWeatherNearSampler;
 uniform sampler3D cloudWeatherFarSampler;
 uniform sampler2D cloudRegimeSampler;
+uniform sampler2D cloudSkipSampler;

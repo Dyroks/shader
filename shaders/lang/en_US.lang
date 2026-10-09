@@ -111,6 +111,10 @@ value.CLOUD_TIME_SOURCE.0=World Time
 value.CLOUD_TIME_SOURCE.1=Real Time
 option.CLOUD_SEED=Seed
 option.CLOUD_SEED.comment=Changes the whole cloud layout.
+option.CLOUD_SKIP_MAP=Empty Space Skipping
+option.CLOUD_SKIP_MAP.comment=Rays cross whole empty areas (tiles of 1.6 / 6.4 / 25.6 km) in one step: far fewer steps in clear or sparse skies, and distant clouds are no longer cut off. Same image, compare the FPS.
+option.CLOUD_DEEP_DIFFUSION=Deep Diffusion
+option.CLOUD_DEEP_DIFFUSION.comment=Sunlight diffusing deep inside clouds (diffusion theory). Lights the inside of clouds when flying through them and their shaded sides. 0 = previous look (darker, more contrast).
 screen.CloudTypes=Cloud Types & Sky...
 screen.CloudTypes.comment=Kind of sky of the day, mid and high cloud layers, thunderstorms
 option.CLOUD_REGIME=Sky

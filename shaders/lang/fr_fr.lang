@@ -111,6 +111,10 @@ value.CLOUD_TIME_SOURCE.0=Temps du monde
 value.CLOUD_TIME_SOURCE.1=Temps réel
 option.CLOUD_SEED=Graine
 option.CLOUD_SEED.comment=Change complètement la disposition des nuages.
+option.CLOUD_SKIP_MAP=Saut des zones vides
+option.CLOUD_SKIP_MAP.comment=Les rayons traversent des zones vides entières (tuiles de 1,6 / 6,4 / 25,6 km) en un seul pas : beaucoup moins de pas par ciel dégagé ou peu nuageux, et les nuages lointains ne sont plus coupés. Image identique : comparer les FPS.
+option.CLOUD_DEEP_DIFFUSION=Diffusion profonde
+option.CLOUD_DEEP_DIFFUSION.comment=Lumière du soleil diffusée au cœur des nuages (théorie de la diffusion). Éclaire l'intérieur des nuages quand on les traverse, et leurs faces à l'ombre. 0 = rendu précédent (plus sombre, plus contrasté).
 screen.CloudTypes=Types de nuages et ciel...
 screen.CloudTypes.comment=Type de ciel du jour, couches de nuages moyens et hauts, orages
 option.CLOUD_REGIME=Ciel

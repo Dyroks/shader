@@ -19,6 +19,9 @@
 #define CLOUD_MARCH_INC
 
 struct CloudResult {
+	#ifdef CLOUD_PROFILE
+		vec4 prof;   // iterations: tile skips + distance field skips, coarse, fine empty, samples
+	#endif
 	float sun;
 	float sky;
 	float T;
@@ -34,10 +37,13 @@ const float cloudTurretMax = 1.15;
 #endif
 
 // p: camera relative position, h: normalised height inside the cloud (0 base .. 1 top)
+// detailAmount: 0..1 detail erosion, 1..2 adds a finer octave for clouds close to the camera
 // lod 0: full density, lod 1: low frequency only (for distant light samples, which would
 // otherwise turn every small bulge into a long shadow streak)
 float CloudDensity(vec3 p, float h, CloudWeather w, float detailAmount, vec3 baseOrigin, vec3 detailOrigin, int lod) {
 	if (w.cov <= 0.0) return 0.0;
+	float nearDetail = CloudSat(detailAmount - 1.0);
+	detailAmount = min(detailAmount, 1.0);
 
 	// Cumulonimbus: type in 1..2 encodes the anvil, the body is the inner part of the
 	// footprint (radius anvilK in footprint units)
@@ -116,6 +122,14 @@ float CloudDensity(vec3 p, float h, CloudWeather w, float detailAmount, vec3 bas
 		float hf = dn.r * 0.5 + dn.g * 0.3 + dn.b * 0.2;
 		float erosion = mix(hf, 1.0 - hf, CloudSat(h * 10.0));
 		d = CloudSat(CloudRemap(d, erosion * CLOUD_EROSION * detailAmount, 1.0, 0.0, 1.0));
+
+		// close to the camera: a 4x finer octave (20 - 80 m features), so nearby clouds stay crisp
+		if (nearDetail > 0.0 && d > 0.0) {
+			vec3 dn2 = textureLod(cloudNoiseDetail, dp * 4.0 / cloudDetailPeriod, 0.0).rgb;
+			float hf2 = dn2.g * 0.6 + dn2.b * 0.4;
+			float erosion2 = mix(hf2, 1.0 - hf2, CloudSat(h * 10.0));
+			d = CloudSat(CloudRemap(d, erosion2 * 0.6 * CLOUD_EROSION * nearDetail, 1.0, 0.0, 1.0));
+		}
 	}
 
 	// Sharpen the density ramp: real cumulus edges are crisp (liquid water content rises
@@ -339,13 +353,50 @@ float CloudLightOpticalDepth(vec3 p, vec3 L, float camY, float jitter, float det
 		float len = norm * pow(ratio, float(i));
 		vec3 sp = p + L * (d + len * jitter);
 		d += len;
-		tau += CloudDensityAt(sp, camY, i == 0 ? detailAmount : 0.0, ctx, i < 2 ? 0 : 1) * len;
+		tau += CloudDensityAt(sp, camY, i == 0 ? min(detailAmount, 1.0) : 0.0, ctx, i < 2 ? 0 : 1) * len;
 	}
 	return tau * cloudSigmaT;
 }
 
+// Shorter steps in the first ~250 m (flying through clouds: sharper edges and wisps)
 float CloudStepLength(float t) {
-	return (60.0 * CLOUD_SCALE + t * 0.012) * CQ_STEP_SCALE;
+	return (clamp(t * 0.25, 15.0 * CLOUD_SCALE, 60.0 * CLOUD_SCALE) + t * 0.012) * CQ_STEP_SCALE;
+}
+
+// ---- Hierarchical empty space skipping -------------------------------------------------------
+// Distance the ray can jump from t without meeting a cloud: it crosses the largest tile of the
+// skip map (begin_c.csh) in which no cloud can be met along its altitude range. 0 if none;
+// retryAt is then the exit of the finest tile (no need to test again before).
+float CloudTileSkip(vec3 dir, float t, float camY, float horiz, bool midOn, float maxHop, out float retryAt) {
+	retryAt = t + maxHop;
+	vec3 p = dir * t;
+	vec2 f = (CloudWeatherCamOffset(cloudWeatherFarTexel) + p.xz) / cloudWeatherFarTexel + cloudWeatherFarSize * 0.5;
+	if (any(lessThan(f, vec2(0.0))) || any(greaterThanEqual(f, vec2(cloudWeatherFarSize)))) return 0.0;
+	vec2 dirT = dir.xz / cloudWeatherFarTexel;   // far texels per block along the ray
+	float a0 = CloudAltitude(p, camY);
+	// lowest point of the (curved) altitude profile of the ray
+	float tLow = dir.y < 0.0 ? -dir.y * (cloudPlanetR + camY) / max(horiz * horiz, 1e-8) : -1.0;
+
+	for (int lev = 2; lev >= 0; lev--) {
+		float n = lev == 2 ? 64.0 : (lev == 1 ? 16.0 : 4.0);
+		vec2 tile = floor(f / n);
+		vec4 s = texelFetch(cloudSkipSampler, ivec2(tile) + ivec2(0, lev == 2 ? 320 : (lev == 1 ? 256 : 0)), 0);
+		// distance to the exit of the tile
+		vec2 lo = tile * n, hi = lo + n;
+		float tx = dirT.x > 1e-9 ? (hi.x - f.x) / dirT.x : (dirT.x < -1e-9 ? (lo.x - f.x) / dirT.x : 1e9);
+		float tz = dirT.y > 1e-9 ? (hi.y - f.y) / dirT.y : (dirT.y < -1e-9 ? (lo.y - f.y) / dirT.y : 1e9);
+		float hop = min(min(tx, tz) + cloudScale, maxHop);
+		// altitude range of the ray over the jump
+		float a1 = CloudAltitude(dir * (t + hop), camY);
+		float aMin = min(a0, a1), aMax = max(a0, a1);
+		if (tLow > t && tLow < t + hop) aMin = min(aMin, CloudAltitude(dir * tLow, camY));
+		bool lowFree = s.x > 0.0 || aMin > cloudAltitude + s.y * cloudKm;
+		// mid layer: the field can rise by at most 0.283 km * cloudMidGrad inside a far texel
+		bool midFree = !midOn || s.w < -0.43 || aMax < cloudMidBottom || aMin > cloudMidTop;
+		if (lowFree && midFree) return hop;
+		retryAt = t + hop;
+	}
+	return 0.0;
 }
 
 // ---- Ray march ------------------------------------------------------------------------------
@@ -354,6 +405,9 @@ float CloudStepLength(float t) {
 CloudResult CloudMarch(vec3 dir, float sceneDist, float camY, vec3 L, bool isSun, vec2 noise) {
 	CloudResult r;
 	r.sun = 0.0; r.sky = 0.0; r.T = 1.0; r.depth = -1.0; r.cost = 0.0;
+	#ifdef CLOUD_PROFILE
+		r.prof = vec4(0.0);
+	#endif
 
 	float time = CloudTime();
 	CloudCtx ctx = CloudMakeCtx(time);
@@ -402,16 +456,37 @@ CloudResult CloudMarch(vec3 dir, float sceneDist, float camY, vec3 L, bool isSun
 		bool fine = false;
 		int empty = 0, samples = 0;
 		float overheadT = 1.0, overheadAt = -1e9;
+		float tileRetry = 0.0;
+		bool midOn = false;
+		#if CLOUD_MID_LAYER > 0
+			midOn = ctx.R.mid > 0.0;
+		#endif
 
 		for (int i = 0; i < CQ_STEPS * 3; i++) {
 			if (t >= tEnd || samples >= CQ_STEPS || r.T < 0.004) break;
 			r.cost += 1.0;
+
+			// cross whole empty tiles at once
+			#ifdef CLOUD_SKIP_MAP
+			if (!fine && t >= tileRetry) {
+				float hop = CloudTileSkip(dir, t, camY, horiz, midOn, tEnd - t, tileRetry);
+				if (hop > 0.0) {
+					#ifdef CLOUD_PROFILE
+						r.prof.x += 1.0;
+					#endif
+					t += hop;
+					tKnown = t;
+					continue;
+				}
+			}
+			#endif
 
 			vec3 p = dir * t;
 			float stepT = CloudStepLength(t);
 			CloudWeather w = CloudSampleWeather(p.xz);
 			float alt = CloudAltitude(p, camY);
 			float detailAmount = 1.0 - smoothstep(detailDist * 0.6, detailDist, t);
+			detailAmount += (1.0 - smoothstep(0.4 * cloudKm, 1.5 * cloudKm, t)) * step(1.0, detailAmount);
 
 			// ---- low / convective clouds
 			// Empty space skipping: above every cloud top of the neighbourhood, the ray can go
@@ -446,7 +521,7 @@ CloudResult CloudMarch(vec3 dir, float sceneDist, float camY, vec3 L, bool isSun
 					jump = min(jump, max(w.midDist * cloudKm / horiz, stepT));
 					if (w.mid > 0.0) {
 						evalMid = true;
-						densMid = CloudMidDensity(p, alt, w, ctx, detailAmount, 0, hMid, thickMid);
+						densMid = CloudMidDensity(p, alt, w, ctx, min(detailAmount, 1.0), 0, hMid, thickMid);
 						// shorter steps in thin parts of the layer (at most 2x more)
 						stepT = min(stepT, max(thickMid * cloudKm * 0.5, stepT * 0.5));
 					}
@@ -456,6 +531,9 @@ CloudResult CloudMarch(vec3 dir, float sceneDist, float camY, vec3 L, bool isSun
 			#endif
 
 			if (!evalLow && !evalMid) {
+				#ifdef CLOUD_PROFILE
+					r.prof.x += 1.0;
+				#endif
 				t += jump;
 				tKnown = t;
 				fine = false;
@@ -463,6 +541,9 @@ CloudResult CloudMarch(vec3 dir, float sceneDist, float camY, vec3 L, bool isSun
 			}
 
 			float dens = densLow + densMid;
+			#ifdef CLOUD_PROFILE
+				if (!fine) r.prof.y += 1.0; else if (dens <= 0.0) r.prof.z += 1.0; else r.prof.w += 1.0;
+			#endif
 			if (!fine) {
 				if (dens > 0.0) {
 					// entering a cloud: step back and refine
@@ -515,7 +596,11 @@ CloudResult CloudMarch(vec3 dir, float sceneDist, float camY, vec3 L, bool isSun
 			}
 			float opticalSize = mix(w.thick * w.dens, thickMid * 0.5, wMid) * cloudKm * cloudSigmaT;
 			float diffuse = (1.0 - exp(-opticalSize * 0.12)) * CloudSat(dens * 4.0);
-			sun += diffusePhase * exp(-tauL * CLOUD_DIFFUSION_DECAY) * diffuse * 0.85;
+			// Deep diffusion: in a nearly non absorbing medium the diffuse flux decays slowly with
+			// depth (diffusion theory: ~ 1 / (1 + 0.75 (1 - g) tau), g ~ 0.87). The exponential alone
+			// left the inside of clouds and their shaded sides far too dark.
+			float diffusion = mix(exp(-tauL * CLOUD_DIFFUSION_DECAY), 1.0 / (1.0 + 0.1 * tauL), CLOUD_DEEP_DIFFUSION);
+			sun += diffusePhase * diffusion * diffuse * 0.85;
 			sun *= lightVis;
 			sun += groundLight * overheadT * CloudSat(1.0 - h) * CloudSat(1.0 - h);
 
