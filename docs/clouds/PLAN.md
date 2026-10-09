@@ -7,9 +7,9 @@ Base du pack : SEUS PTGI HRR 2.1 GFME, Iris 1.11.7, Minecraft 26.3, Voxy.
 
 | Phase | Contenu | État |
 |---|---|---|
-| 0 | Fondations : outils, textures de bruit, squelette Iris, menu, suppression des anciens nuages | ✅ livrée, à tester en jeu |
-| 1 | Forme, météo, raymarching, reconstruction temporelle, composition | ✅ livrée, à tester en jeu |
-| 2 | Éclairage physique complet : phase, diffusion multiple, ambiance, couleur du soleil à l'altitude, nuit | 🟡 en partie anticipée (voir plus bas) |
+| 0 | Fondations : outils, textures de bruit, squelette Iris, menu, suppression des anciens nuages | ✅ testée en jeu |
+| 1 | Forme, météo, raymarching, reconstruction temporelle, composition | ✅ testée en jeu (OK avec Voxy, perte de FPS faible) |
+| 2 | Éclairage : phase, diffusion, ambiance, couleur du soleil à l'altitude, crépuscule, nuit + retours du test (formes moins rondes, bruit temporel) | ✅ livrée, à tester |
 | 3 | Intégration : capture du ciel pour la GI et les réflexions, ombres des nuages, rayons de lumière, eau | ⏳ |
 | 4 | Atmosphère Hillaire 2020 (tables précalculées), remplacement du ciel SEUS, option SEUS/Hillaire | ⏳ |
 | 5 | Variété : couches moyennes et hautes (Ac, As, Ci, Cs, Cc), cumulonimbus et enclume, régimes météo, éclairs | ⏳ |
@@ -19,7 +19,15 @@ Base du pack : SEUS PTGI HRR 2.1 GFME, Iris 1.11.7, Minecraft 26.3, Voxy.
 Configuration de test de l'utilisateur : RTX 4080, 4K, Voxy, carte custom avec des montagnes d'environ 2000 blocs.
 Référence : 50-60 FPS à l'arrêt, environ 45 en mouvement, sans nuages.
 
-## Architecture (phases 0-1)
+## Retours de test
+
+- **Test 1 (phases 0-1)** : pas de bug, perte de FPS faible, Voxy OK, la pluie augmente la couverture.
+  - Bruit visuel quand la caméra bouge : reconstruction temporelle. Atténué en phase 2 (écrêtage par variance,
+    historique plus long). On peut encore le réduire : débruitage spatial, rendu complet (`CLOUD_RES` 1).
+  - Formes trop arrondies : en phase 2, ajout de tourelles (sommet local variable), d'une déformation du bruit,
+    d'un cisaillement du vent et d'une érosion plus forte. Réglables avec *Érosion* et *Irrégularité*.
+
+## Architecture (phases 0-2)
 
 Le pack rend la scène à **demi-résolution** dans le quart bas-gauche de l'écran (HRR), puis son TAA (`composite7`)
 reconstruit la pleine résolution. Les buffers des nuages suivent cette grille « interne » : en 4K, l'interne fait 1920×1080.
@@ -62,12 +70,16 @@ composite4.fsh   composition             couleurs du soleil et du ciel, perspect
 - **Accélération** : la carte météo stocke une borne inférieure de la distance horizontale au nuage le plus proche,
   et le sommet maximal local. Le raymarching saute ainsi le vide horizontalement et au-dessus des nuages.
   Les pas sont grossiers dans le vide et fins dans les nuages, avec un retour en arrière à l'entrée.
+- **Formes (phase 2)** : tourelles (sommet local de 0,6× à 1,15× l'épaisseur via un champ 2D), déformation du domaine
+  du bruit de base, cisaillement du vent avec la hauteur, érosion de détail appliquée avant l'accentuation des bords.
 - **Éclairage** :
   - fonction de phase « gouttelettes » : Henyey-Greenstein + Draine (Jendersie & d'Eon 2023), lobe avant élargi ;
   - diffusion d'ordres bas par octaves ;
   - **terme de diffusion** en exp(−τ·(1−g)), qui rend le côté éclairé lumineux ;
   - ciel selon la hauteur dans le nuage, et rebond du sol sous la base ;
-  - intégration conservatrice d'énergie (Hillaire 2016).
+  - intégration conservatrice d'énergie (Hillaire 2016) ;
+  - (phase 2) couleur du soleil à l'altitude du nuage, avec moins d'atmosphère au-dessus et l'abaissement de l'horizon.
+    Les nuages restent éclairés un peu après le coucher du soleil au sol. La nuit, éclairage par la lune.
 - **Sortie** : quantités scalaires (lumière du soleil diffusée, lumière du ciel diffusée, transmittance, profondeur).
   Les couleurs du soleil et du ciel sont appliquées à la composition, avec les fonctions d'atmosphère SEUS
   en attendant la phase 4.
@@ -78,7 +90,6 @@ composite4.fsh   composition             couleurs du soleil et du ciel, perspect
 - Pas d'ombres des nuages sur le terrain ni dans les rayons de lumière (phase 3).
 - **Sous l'eau**, les nuages ne sont pas composés (phase 3).
 - La perspective atmosphérique SEUS suppose une caméra au sol. Les rayons vers le bas utilisent la direction miroir (phase 4).
-- La couleur du soleil est celle du sol, pas celle de l'altitude du nuage (phase 2/4).
 - Une seule couche basse/moyenne : pas encore de cirrus ni d'enclumes (phase 5).
 - L'intérieur des nuages fonctionne, mais avec des pas grossiers près de la caméra (phase 6).
 

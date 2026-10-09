@@ -22,10 +22,19 @@ uniform sampler3D cloudWeatherNearSampler;
 // Scene radiance units: composite4 works with (deferred12 radiance) * 0.001 * 120
 const float cloudToComposite = 0.12;
 
-// Sun irradiance matching the pack's terrain lighting (24 * colorSunlight radiance on a
-// white surface facing the sun -> irradiance 24 * pi * colorSunlight)
-vec3 CloudSunIrradiance() {
-	return colorSunlight * (24.0 * cloudPI * SUNLIGHT_BRIGHTNESS * CLOUD_SUNLIGHT);
+// Irradiance of the light used by the ray march (sun, or moon at night), matching the pack's
+// terrain lighting: 24 * colorSunlight radiance on a white surface facing the sun ->
+// irradiance 24 * pi * colorSunlight. The sun colour is evaluated at the cloud altitude
+// (less atmosphere above it, still lit after sunset); its visibility is in the ray march.
+vec3 CloudLightIrradiance(vec3 worldDir, float depth) {
+	vec3 c;
+	if (worldSunVector.y > cloudSunModeLimit) {
+		float alt = cameraPosition.y + worldDir.y * depth + depth * depth / (2.0 * cloudPlanetR);
+		c = CloudSunColorAtAltitude(worldSunVector.y, alt, wetness);
+	} else {
+		c = colorSunlight;   // moon light at night
+	}
+	return c * (24.0 * cloudPI * SUNLIGHT_BRIGHTNESS * CLOUD_SUNLIGHT);
 }
 
 vec3 CloudHeatColor(float x) {
@@ -60,7 +69,7 @@ void CloudComposite(inout vec3 color, vec3 worldDir, vec2 tc, vec3 skyAmbient) {
 	}
 
 	float T = CloudSat(hist.z);
-	vec3 light = CloudSunIrradiance() * max(hist.x, 0.0) + skyAmbient * (max(hist.y, 0.0) * CLOUD_AMBIENT);
+	vec3 light = CloudLightIrradiance(worldDir, depthKm * 1000.0) * max(hist.x, 0.0) + skyAmbient * (max(hist.y, 0.0) * CLOUD_AMBIENT);
 
 	#ifdef CLOUD_AERIAL_PERSPECTIVE
 		// The SEUS atmosphere assumes a camera on the ground and gets very dense for downward

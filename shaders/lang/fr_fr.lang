@@ -72,6 +72,10 @@ option.CLOUD_COVERAGE=Couverture
 option.CLOUD_COVERAGE.comment=Fraction moyenne du ciel couverte par les nuages.
 option.CLOUD_CONVECTION=Convection
 option.CLOUD_CONVECTION.comment=0 = nuages plats en couches, 1 = cumulus hauts en tours.
+option.CLOUD_EROSION=Érosion
+option.CLOUD_EROSION.comment=Érosion à petite échelle des bords (bosses en chou-fleur en haut, filaments en bas).
+option.CLOUD_IRREGULARITY=Irrégularité
+option.CLOUD_IRREGULARITY.comment=Déformation des formes et variation de hauteur des sommets (tourelles).
 option.CLOUD_DENSITY=Densité
 option.CLOUD_DENSITY.comment=Multiplicateur de densité optique.
 option.CLOUD_WEATHER_VARIATION=Variation météo

@@ -174,6 +174,31 @@ bool CloudShellSegment(vec3 dir, float camY, float bottom, float top, out float 
 	return tEnd > tStart;
 }
 
+// ---- Sun / moon -------------------------------------------------------------------------
+// Clouds keep seeing the sun a little after it set for the ground: the horizon dips by
+// sqrt(2 h / R) at altitude h. The clouds are lit by the sun while it is less than this many
+// radians below the horizon, by the moon otherwise (same test in the ray march and composite).
+const float cloudSunModeLimit = -0.1;
+
+float CloudHorizonDip(float altitude) {
+	return sqrt(2.0 * max(altitude - 63.0, 0.0) / cloudPlanetR);
+}
+
+// Visibility of the sun disc from a given altitude (0 below the local horizon)
+float CloudSunVisibility(float sunY, float altitude) {
+	return CloudSat((sunY + CloudHorizonDip(altitude)) * 40.0);
+}
+
+// Colour of the sunlight reaching a given altitude: the pack's sunlight model (see
+// colorSunlight in shaders.properties) with the elevation corrected for the horizon dip and
+// the air mass reduced by the thinner atmosphere above the cloud (scale height ~8 km).
+vec3 CloudSunColorAtAltitude(float sunY, float altitude, float wet) {
+	float y = max(sunY + CloudHorizonDip(altitude), 0.002);
+	float airMass = 0.233333 * (1.0 - exp(-y * 24.0)) / y;
+	airMass *= exp(-max(altitude - 63.0, 0.0) / 8000.0);
+	return exp((-vec3(0.175, 0.405, 0.995) - wet) * airMass) * vec3(0.976709, 0.946058, 0.871758);
+}
+
 // ---- Phase functions ------------------------------------------------------------------
 float CloudPhaseHG(float c, float g) {
 	float g2 = g * g;

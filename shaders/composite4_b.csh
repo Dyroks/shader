@@ -24,7 +24,8 @@ uniform sampler2D cloudHistBSampler;
 layout(rgba16f) uniform writeonly image2D cloudHistA;
 layout(rgba16f) uniform writeonly image2D cloudHistB;
 
-const float cloudHistoryMax = 5.0;  // max accumulated samples per pixel
+const float cloudHistoryMax = 10.0;  // max accumulated samples per pixel
+const float cloudClipGamma = 1.5;    // variance clipping width (in standard deviations)
 
 bool CloudBad(vec4 v) {
 	return any(isnan(v)) || any(isinf(v));
@@ -51,8 +52,11 @@ void main() {
 		vec4 cur = texelFetch(cloudRawSampler, rp, 0);
 		if (CloudBad(cur)) cur = vec4(0.0, 0.0, 1.0, -1.0);
 
-		// Neighbourhood of the current low resolution samples: colour bounds and depth
+		// Neighbourhood of the current low resolution samples: statistics for variance clipping
+		// (Salvi 2016), min/max as an outer bound, and depth
 		vec3 mn = cur.xyz, mx = cur.xyz;
+		vec3 m1 = cur.xyz, m2 = cur.xyz * cur.xyz;
+		float n = 1.0;
 		float depthKm = cur.w;
 		for (int y = -1; y <= 1; y++)
 		for (int x = -1; x <= 1; x++) {
@@ -61,13 +65,18 @@ void main() {
 			if (CloudBad(v)) continue;
 			mn = min(mn, v.xyz);
 			mx = max(mx, v.xyz);
+			m1 += v.xyz;
+			m2 += v.xyz * v.xyz;
+			n += 1.0;
 			depthKm = max(depthKm, v.w);
 		}
 		if (cur.w > 0.0) depthKm = cur.w;
 		if (depthKm <= 0.0) depthKm = 10.0 * cloudScale;
-		vec3 pad = (mx - mn) * 0.15 + vec3(0.002, 0.002, 0.01);
-		mn -= pad;
-		mx += pad;
+		m1 /= n;
+		vec3 sigma = sqrt(max(m2 / n - m1 * m1, 0.0));
+		vec3 pad = vec3(0.002, 0.002, 0.01);
+		mn = max(mn, m1 - sigma * cloudClipGamma) - pad;
+		mx = min(mx, m1 + sigma * cloudClipGamma) + pad;
 
 		// Spatial estimate for pixels without a fresh sample (bilinear over this frame's samples)
 		vec2 rawSize = vec2(textureSize(cloudRawSampler, 0));
@@ -94,8 +103,8 @@ void main() {
 		if (valid) {
 			hist.xyz = clamp(hist.xyz, mn, mx);
 			if (fresh) {
-				float n = min(hist.w, cloudHistoryMax - 1.0);
-				result = vec4(mix(hist.xyz, cur.xyz, 1.0 / (n + 1.0)), n + 1.0);
+				float count = min(hist.w, cloudHistoryMax - 1.0);
+				result = vec4(mix(hist.xyz, cur.xyz, 1.0 / (count + 1.0)), count + 1.0);
 			} else {
 				result = hist;
 			}

@@ -64,8 +64,12 @@ ivec2 CloudCheckerOffset(int frame) {
 	return ivec2(i == 1 || i == 2 ? 1 : 0, i == 1 || i == 3 ? 1 : 0);
 }
 
-vec3 CloudLightDirection() {
-	return normalize(shadowModelViewInverse[2].xyz);
+// Light used by the ray march: the sun while clouds can still see it, the moon otherwise.
+// w = 1 when it is the sun.
+vec4 CloudLightDirection() {
+	vec3 L = normalize(shadowModelViewInverse[2].xyz);   // pack's light: sun by day, moon by night
+	vec3 sun = sunAngle < 0.5 ? L : -L;
+	return sun.y > cloudSunModeLimit ? vec4(sun, 1.0) : vec4(-sun, 0.0);
 }
 
 #endif

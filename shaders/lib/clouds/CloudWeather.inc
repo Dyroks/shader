@@ -163,7 +163,7 @@ void CloudCells(vec2 q, vec2 warp, float L, int octave, float time, vec2 regimeO
 		float base   = reg.z + (r2.w - 0.5) * 0.12 - 0.05 * thick;
 		float dens   = mix(0.8, 1.2, fract(r2.x * 7.31 + r2.w));
 
-		if (edgeDist < cloudSkipRadius * cloudKm) maxTop = max(maxTop, base + thick);
+		if (edgeDist < cloudSkipRadius * cloudKm) maxTop = max(maxTop, base + thick * 1.15);  // 1.15 = cloudTurretMax
 
 		float qn = len / rad;
 		if (qn > 1.6) continue;

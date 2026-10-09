@@ -102,6 +102,7 @@ uniform mat4 gbufferProjectionInverse;
 uniform float viewWidth, viewHeight, frameTimeCounter, wetness, nightBrightness, timeMidnight;
 uniform int frameCounter, worldTime;
 uniform vec3 worldSunVector, worldLightVector, colorSunlight;
+uniform float sunAngle;
 uniform float groundY;
 layout(rgba32f) uniform writeonly image2D outImg;
 
@@ -261,7 +262,7 @@ def main():
 
     el, az = math.radians(args.sun), math.radians(args.sun_az)
     sun = np.array([math.cos(el) * math.sin(az), math.sin(el), -math.cos(el) * math.cos(az)])
-    light = sun if sun[1] > -0.05 else -sun
+    light = sun if sun[1] > 0 else -sun  # pack: the shadow light switches to the moon at sunset
     shadowMVInv = np.identity(4); shadowMVInv[:3, 2] = light
     nightBrightness = 0.0001
     Ly = light[1]
@@ -313,6 +314,7 @@ def main():
         set_u(p, "frameCounter", frame)
         set_u(p, "worldTime", int(args.time)); set_u(p, "worldDay", 0)
         set_u(p, "worldSunVector", tuple(sun)); set_u(p, "worldLightVector", tuple(light))
+        set_u(p, "sunAngle", 0.25 if sun[1] > 0 else 0.75)
         set_u(p, "colorSunlight", colorSunlight)
         set_u(p, "nightBrightness", nightBrightness)
         set_u(p, "timeMidnight", float(np.clip(-sun[1] * 10, 0, 1)))

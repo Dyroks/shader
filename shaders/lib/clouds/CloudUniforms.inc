@@ -14,6 +14,7 @@ uniform mat4 shadowModelViewInverse;
 uniform float viewWidth;
 uniform float viewHeight;
 uniform float frameTimeCounter;
+uniform float sunAngle;
 uniform float wetness;
 uniform float rainStrength;
 uniform float thunderStrength;

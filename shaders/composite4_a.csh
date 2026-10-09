@@ -46,7 +46,8 @@ void main() {
 		vec2 noise = texelFetch(noisetex, px & 63, 0).rg;
 		noise = fract(noise + vec2(0.447213595, 1.41421356) * float(frameCounter % 64));
 
-		CloudResult r = CloudMarch(dir, sceneDist, cameraPosition.y, CloudLightDirection(), noise);
+		vec4 light = CloudLightDirection();
+		CloudResult r = CloudMarch(dir, sceneDist, cameraPosition.y, light.xyz, light.w > 0.5, noise);
 
 		vec4 outv = vec4(r.sun, r.sky, r.T, r.depth > 0.0 ? r.depth * 0.001 : -1.0);
 		#if CLOUD_DEBUG_VIEW == 3
