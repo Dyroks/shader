@@ -120,9 +120,6 @@ vec2 Texcoord;
        c=mix(c*h,c,t);
      }
    c=TintUnderwaterDepth(c);
-   #ifdef CLOUD_SHADOW
-   c*=CloudShadow(v,worldLightVector);
-   #endif
    return c*(1.-wetness);
  }
  vec3 p(vec2 v)
@@ -358,9 +355,6 @@ vec2 Texcoord;
            j=DoNightEyeAtNight(j*12.,timeMidnight)*.083333;
            vec3 L=j,A=L;
            A+=RenderSunDiscRefelction(F.direction,worldSunVector,colorSunlight)*AtmosphereAbsorption(F.direction,AtmosphereExtent)*2000.;
-           #ifdef CLOUDS_IN_GI
-           CloudPlane(A,vec3(0.),-F.direction,worldLightVector,worldSunVector,colorSunlight,colorSkyUp,L,timeMidnight,true);
-           #endif
            L=TintUnderwaterDepth(A);
            N+=L*.1*l*stainedColor;
            J=114514.;

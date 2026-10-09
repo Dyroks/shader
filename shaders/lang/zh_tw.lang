@@ -29,16 +29,6 @@ screen.Others=其他
 screen.Others.comment=一些雜項設定
 
 # 大氣選項
-option.CLOUDS_IN_GI=天空光照雲色計算（光線追蹤的範圍內）
-option.CLOUDS_IN_GI.comment=在光線追蹤時計算雲的顏色。關閉後會使光線追蹤時的天空光照變藍
-option.CLOUDS_IN_AMBIENT=天空光照雲色計算（光線追蹤的範圍外）
-option.CLOUDS_IN_AMBIENT.comment=在光線追蹤範圍之外的天空光照中計算雲的顏色。關閉後會使光線追蹤範圍之外的天空光照變藍
-option.CIRRUS_CLOUDS=卷雲
-option.CIRRUS_CLOUDS.comment=高空中較為稀薄的雲
-option.CUMULUS_CLOUDS=積雲
-option.CUMULUS_CLOUDS.comment=較低並且厚實的雲
-option.CLOUDS_BLOCKY=方塊雲
-option.CLOUDS_BLOCKY.comment=讓雲層的分布看起來更有方塊感
 option.GODRAYS=體積光
 option.GODRAYS.comment=陽光在大氣中產生的立體光束，不會影響水下的體積光
 option.GODRAYS_STAINED_GLASS_TINT=體積光染色
@@ -63,8 +53,6 @@ option.RAY_TRACE_SHADOW=光線追蹤陰影
 option.RAY_TRACE_SHADOW.comment=使用光線追蹤的銜接陰影，銜接準確性極佳但不支援部分方塊。建議在螢幕空間陰影開啟時關閉此設定以減少性能消耗
 option.SCREEN_SPACE_SHADOW=螢幕空間陰影
 option.SCREEN_SPACE_SHADOW.comment=PTGI 預設的銜接陰影，準確性不佳但支援所有不透明方塊，建議在開啟時關閉光線追蹤陰影以減少性能消耗
-option.CLOUD_SHADOW=雲影
-option.CLOUD_SHADOW.comment=雲遮擋陽光所產生的陰影，同時影響體積光中是否計算雲
 
 # 光照選項
 option.SUNLIGHT_BRIGHTNESS=日光強度

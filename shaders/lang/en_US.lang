@@ -28,16 +28,82 @@ screen.Others=Others
 screen.Others.comment=Some extra settings
 
 # Atmosphere
-option.CLOUDS_IN_GI=Clouds in GI
-option.CLOUDS_IN_GI.comment=Whether to consider clouds in GI light tracing. Allows clouds to impact ambient lighting color at the cost of performance
-option.CLOUDS_IN_AMBIENT=Clouds in Ambient
-option.CLOUDS_IN_AMBIENT=Whether to consider clouds in ambient lighting at far distances. Gets better connection at the edge of raytracing at the cost of performance
-option.CIRRUS_CLOUDS=Cirrus Clouds
-option.CIRRUS_CLOUDS.comment=Whether to draw cirrus clouds. Doesn't impact performance as much as cumulus clouds. Impacts performance, especially if Clouds in GI and/or Clouds in Reflections are enabled
-option.CUMULUS_CLOUDS=Cumulus Clouds
-option.CUMULUS_CLOUDS.comment=Whether to draw cumulus clouds. Impacts performance, especially if Clouds in GI and/or Clouds in Reflections are enabled
-option.CLOUDS_BLOCKY=Blocky Clouds
-option.CLOUDS_BLOCKY.comment=Whether to draw cumulus clouds in a blocky shape. For that Minecrafty feel
+# Volumetric clouds
+screen.Clouds=Clouds...
+screen.Clouds.comment=Volumetric clouds: quality, shape, weather and lighting
+screen.CloudQuality=Cloud Quality...
+screen.CloudQuality.comment=Presets and fine performance settings
+screen.CloudWorld=Shape & Weather...
+screen.CloudWorld.comment=Scale, altitude, coverage, cloud types, wind
+screen.CloudLighting=Cloud Lighting...
+screen.CloudLighting.comment=Light received by the clouds
+option.VOLUMETRIC_CLOUDS=Volumetric Clouds
+option.VOLUMETRIC_CLOUDS.comment=Enables the volumetric cloud system.
+option.CLOUD_QUALITY=Quality
+option.CLOUD_QUALITY.comment=Quality preset. "Custom" uses the settings below (steps, light samples, etc.).
+value.CLOUD_QUALITY.0=Low
+value.CLOUD_QUALITY.1=Medium
+value.CLOUD_QUALITY.2=High
+value.CLOUD_QUALITY.3=Ultra
+value.CLOUD_QUALITY.4=Custom
+option.CLOUD_RES=Compute Resolution
+option.CLOUD_RES.comment=Full: every pixel is ray marched every frame (slow). 1/4 per frame: one pixel out of four per frame, reconstructed over time (much faster).
+value.CLOUD_RES.1=Full
+value.CLOUD_RES.2=1/4 per frame
+option.CLOUD_TEMPORAL=Temporal Accumulation
+option.CLOUD_TEMPORAL.comment=Accumulates several frames to reduce noise. May leave slight trails in fast motion.
+option.CLOUD_MAX_DISTANCE=Max Distance
+option.CLOUD_MAX_DISTANCE.comment=Cloud render distance in km (multiplied by the cloud scale).
+option.CLOUD_STEPS=[Custom] Cloud Steps
+option.CLOUD_STEPS.comment=Max samples inside clouds along a ray. Only used with the Custom quality.
+option.CLOUD_LIGHT_STEPS=[Custom] Light Samples
+option.CLOUD_LIGHT_STEPS.comment=Samples toward the sun for each cloud sample (self shadowing). Only used with the Custom quality.
+option.CLOUD_MS_OCTAVES=[Custom] Scattering Octaves
+option.CLOUD_MS_OCTAVES.comment=Approximated multiple scattering orders. Only used with the Custom quality.
+option.CLOUD_DETAIL_DISTANCE=[Custom] Detail Distance
+option.CLOUD_DETAIL_DISTANCE.comment=Distance (km) up to which small details are computed. Only used with the Custom quality.
+option.CLOUD_STEP_SCALE=[Custom] Step Length
+option.CLOUD_STEP_SCALE.comment=Step length multiplier: lower = finer and slower. Only used with the Custom quality.
+option.CLOUD_SCALE=Cloud Scale
+option.CLOUD_SCALE.comment=Size of everything cloud related. 1.0 = real world scale (a cumulus is about 1 km wide). Lower it for vanilla sized worlds. Rendering stays identical at every scale.
+option.CLOUD_ALTITUDE=Altitude
+option.CLOUD_ALTITUDE.comment=Altitude (absolute Y) of the base of low clouds.
+option.CLOUD_COVERAGE=Coverage
+option.CLOUD_COVERAGE.comment=Average fraction of the sky covered by clouds.
+option.CLOUD_CONVECTION=Convection
+option.CLOUD_CONVECTION.comment=0 = flat layered clouds, 1 = tall towering cumulus.
+option.CLOUD_DENSITY=Density
+option.CLOUD_DENSITY.comment=Optical density multiplier.
+option.CLOUD_WEATHER_VARIATION=Weather Variation
+option.CLOUD_WEATHER_VARIATION.comment=How much coverage and cloud types vary across the sky and over time.
+option.CLOUD_WIND_SPEED=Wind Speed
+option.CLOUD_WIND_SPEED.comment=Wind speed in m/s (multiplied by the scale).
+option.CLOUD_WIND_ANGLE=Wind Direction
+option.CLOUD_WIND_ANGLE.comment=Wind direction in degrees.
+option.CLOUD_EVOLUTION=Evolution
+option.CLOUD_EVOLUTION.comment=How fast cloud shapes evolve.
+option.CLOUD_TIME_SOURCE=Time Source
+option.CLOUD_TIME_SOURCE.comment=World time: clouds follow the game time (frozen when the daylight cycle is off). Real time: clouds always move.
+value.CLOUD_TIME_SOURCE.0=World Time
+value.CLOUD_TIME_SOURCE.1=Real Time
+option.CLOUD_SEED=Seed
+option.CLOUD_SEED.comment=Changes the whole cloud layout.
+option.CLOUD_AMBIENT=Sky Light
+option.CLOUD_AMBIENT.comment=Sky light received by the clouds.
+option.CLOUD_SUNLIGHT=Sun Light
+option.CLOUD_SUNLIGHT.comment=Sun light received by the clouds.
+option.CLOUD_GROUND_BOUNCE=Ground Bounce
+option.CLOUD_GROUND_BOUNCE.comment=Ground albedo for the light bounced onto cloud bases. 0 disables it.
+option.CLOUD_AERIAL_PERSPECTIVE=Aerial Perspective
+option.CLOUD_AERIAL_PERSPECTIVE.comment=Atmospheric haze between the camera and the clouds.
+option.CLOUD_DEBUG_VIEW=Debug View
+option.CLOUD_DEBUG_VIEW.comment=Testing aid: clouds only, top-down weather map (bottom left corner), ray march cost (blue = cheap, red = expensive), transmittance.
+value.CLOUD_DEBUG_VIEW.0=Off
+value.CLOUD_DEBUG_VIEW.1=Clouds Only
+value.CLOUD_DEBUG_VIEW.2=Weather Map
+value.CLOUD_DEBUG_VIEW.3=Cost
+value.CLOUD_DEBUG_VIEW.4=Transmittance
+
 option.GODRAYS=Atmospheric Godrays
 option.GODRAYS.comment=Enables volumetric lighting from sunlight (aka "Godrays") while not underwater
 option.GODRAYS_STAINED_GLASS_TINT=Godrays Stained Glass Tint
@@ -63,8 +129,6 @@ option.RAY_TRACE_SHADOW=Ray Traced Shadow
 option.RAY_TRACE_SHADOW.comment=Ray traced shadow, can get exact connection shadow, but doesn't support some blocks
 option.SCREEN_SPACE_SHADOW=Screen-Space Shadow
 option.SCREEN_SPACE_SHADOW.comment=Default connection shadow of PTGI, isn't as precise as ray traced shadow, but supports all blocks and entities
-option.CLOUD_SHADOW=Cloud Shadow
-option.CLOUD_SHADOW.comment=Shadow of clouds. Affects Godrays too
 
 # Lighting
 option.SUNLIGHT_BRIGHTNESS=Sunlight Intensity

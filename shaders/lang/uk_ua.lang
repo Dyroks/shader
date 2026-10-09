@@ -28,16 +28,6 @@ screen.Others=Інші
 screen.Others.comment=Додаткові налаштування
 
 # Atmosphere
-option.CLOUDS_IN_GI=Хмари в GI
-option.CLOUDS_IN_GI.comment=Чи враховувати хмари при трасуванні світла GI. Дозволяє хмарам впливати на колір навколишнього освітлення за рахунок продуктивності
-option.CLOUDS_IN_AMBIENT=Хмари в амбієнтному освітленні
-option.CLOUDS_IN_AMBIENT.comment=Чи враховувати хмари в амбієнтному освітленні на великих відстанях. Покращує зв'язок на межі трасування променів за рахунок продуктивності
-option.CIRRUS_CLOUDS=Хмари Цирус
-option.CIRRUS_CLOUDS.comment=Чи малювати хмари цирус. Менше впливає на продуктивність, ніж купчасті хмари. Впливає на продуктивність, особливо якщо увімкнені хмари в GI та/або хмари у відбиттях
-option.CUMULUS_CLOUDS=Купчасті хмари
-option.CUMULUS_CLOUDS.comment=Чи малювати купчасті хмари. Впливає на продуктивність, особливо якщо увімкнені хмари в GI та/або хмари у відбиттях
-option.CLOUDS_BLOCKY=Блокоподібні хмари
-option.CLOUDS_BLOCKY.comment=Чи малювати купчасті хмари у вигляді блоків. Для Minecraft-стилю
 option.GODRAYS=Атмосферні промені світла
 option.GODRAYS.comment=Увімкнення об'ємного освітлення від сонячного світла (так звані "промені бога"), коли не під водою
 option.GODRAYS_STAINED_GLASS_TINT=Тоновані промені світла через вітражі
@@ -63,8 +53,6 @@ option.RAY_TRACE_SHADOW=Рей-трейсинг тіней
 option.RAY_TRACE_SHADOW.comment=Рей-трейсинг тіней, може дати точні тіні, але не підтримує деякі блоки
 option.SCREEN_SPACE_SHADOW=Тіні в екрані
 option.SCREEN_SPACE_SHADOW.comment=Типова тінь PTGI, не така точна, як тінь від рей-трейсингу, але підтримує всі блоки та сутності
-option.CLOUD_SHADOW=Тінь від хмар
-option.CLOUD_SHADOW.comment=Тінь від хмар. Також впливає на промені світла
 
 # Lighting
 option.SUNLIGHT_BRIGHTNESS=Інтенсивність сонячного світла

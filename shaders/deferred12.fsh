@@ -482,7 +482,6 @@ vec3 SpecularGGX(vec3 N, vec3 V, vec3 L, float roughness, float F0)
        vec3 J=AtmosphereAbsorption(p.xyz,AtmosphereExtent);
        n+=v.albedo.xyz*J*.2;
        n+=RenderSunDisc(p,worldSunVector,colorSunlight)*J*2000.;
-       CloudPlane(n,vec3(0.),-p,worldLightVector,worldSunVector,colorSunlight,colorSkyUp,q,timeMidnight,true);
      }
    else
      {
@@ -535,9 +534,6 @@ vec3 SpecularGGX(vec3 N, vec3 V, vec3 L, float roughness, float F0)
            #endif
            #ifdef SCREEN_SPACE_SHADOW
            Y*=ScreenSpaceShadow(s.xyz,f.xyz,v.geoNormal.xyz,x,randomness.x);
-           #endif
-           #ifdef CLOUD_SHADOW
-           Y*=CloudShadow(a.xyz,worldLightVector);
            #endif
            n+=TintUnderwaterDepth(DoNightEyeAtNight(l*v.albedo.xyz*Y*colorSunlight,timeMidnight));
            vec3 R=SpecularGGX(y,-m,worldLightVector,1.-v.smoothness,v.metalness*.96+.04)*Y;

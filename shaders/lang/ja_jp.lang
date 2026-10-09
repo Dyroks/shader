@@ -28,16 +28,6 @@ screen.Others=その他
 screen.Others.comment=いくつかの追加設定
 
 # Atmosphere
-option.CLOUDS_IN_GI=GIで雲を考慮する
-option.CLOUDS_IN_GI.comment=GIライトトレーシングで雲を考慮するかどうか。雲が周囲の光の色に影響を与えるようになりますが、パフォーマンスが低下します
-option.CLOUDS_IN_AMBIENT=大気中の雲
-option.CLOUDS_IN_AMBIENT.comment=遠距離での環境光に雲を考慮するかどうか。レイトレースの端でより良い接続が得られますが、パフォーマンスが低下します
-option.CIRRUS_CLOUDS=巻雲
-option.CIRRUS_CLOUDS.comment=巻雲を描画するかどうか。積雲ほどパフォーマンスに影響しません。特にGIでの雲や反射での雲が有効になっている場合、パフォーマンスに影響します
-option.CUMULUS_CLOUDS=積雲
-option.CUMULUS_CLOUDS.comment=積雲を描画するかどうか。特にGIでの雲や反射での雲が有効になっている場合、パフォーマンスに影響します
-option.CLOUDS_BLOCKY=ブロック調の雲
-option.CLOUDS_BLOCKY.comment=積雲をブロック状に描画するかどうか。マインクラフトらしい雰囲気を出せます
 option.GODRAYS=大気中のゴッドレイ
 option.GODRAYS.comment=水中にいない時に太陽光からのボリュメトリックライティング（ゴッドレイ）を有効にします
 option.GODRAYS_STAINED_GLASS_TINT=ゴッドレイのステンドグラス着色
@@ -63,8 +53,6 @@ option.RAY_TRACE_SHADOW=レイトレース影
 option.RAY_TRACE_SHADOW.comment=レイトレースされた影。正確な繋がりのある影を得られますが、一部のブロックはサポートしていません
 option.SCREEN_SPACE_SHADOW=スクリーンスペース影
 option.SCREEN_SPACE_SHADOW.comment=PTGIのデフォルトの影。レイトレース影ほど正確ではありませんが、すべてのブロックとエンティティをサポートします
-option.CLOUD_SHADOW=雲の影
-option.CLOUD_SHADOW.comment=雲の影。ゴッドレイにも影響します
 
 # Lighting
 option.SUNLIGHT_BRIGHTNESS=太陽光の強度

@@ -26,6 +26,11 @@ flat in vec3 colorSkyUp;
 #include "/lib/GBufferData.inc"
 #include "/lib/Materials.inc"
 
+#ifdef VOLUMETRIC_CLOUDS
+flat in vec3 cloudSkyAmbient;
+#include "/lib/clouds/CloudComposite.inc"
+#endif
+
 
 const int shadowMapResolution = 8192; // Higher value impacts performance costs, but can get better shadow, and increase path tracing distance. Please increase the shadow distance at the same time. 4096 - 80 blocks path tracing. 8192 - 160 blocks path tracing. 16384 - 300 blocks path tracing, requires at least 6GB VRAM. 34768 - 530 blocks of path tracing, requires at least 20GB VRAM. [4096 8192 16384 32768]
 const float SHADOW_MAP_RESOLUTION = shadowMapResolution * MC_SHADOW_QUALITY;
@@ -150,9 +155,6 @@ vec3 WorldPosToShadowProjPos(vec3 worldPos)
                    Z*=Z;
                  }
                #endif
-               #ifdef CLOUD_SHADOW
-               Z*=CloudShadow(W.xyz, worldLightVector);
-               #endif
                if(eyeInWater)
                  {
                    float ag=shadow2DLod(shadowtex0,vec3(K.xy-vec2(0.,.5),K.z),1).x,ae=(1.-texture2DLod(shadowcolor1,K.xy-vec2(0.,.5),1).x)*512.-(128.+W.y+cameraPosition.y),af=GetCausticsComposite(W,worldLightVector,max(0.,ae));
@@ -190,6 +192,10 @@ vec3 WorldPosToShadowProjPos(vec3 worldPos)
      }
    if(d.sky<.5&&isEyeInWater<1)
      LandAtmosphericScattering(U,i.xyz,c.xyz,worldSunVector.xyz);
+   #ifdef VOLUMETRIC_CLOUDS
+   if(isEyeInWater==0)
+     CloudComposite(U,c.xyz,texcoord.xy,cloudSkyAmbient);
+   #endif
    U/=120.;
    U*=exp(-r*blindness);
    U=pow(U.xyz,vec3(.454545));

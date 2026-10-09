@@ -28,16 +28,82 @@ screen.Others=Autres
 screen.Others.comment=Autres paramètres
 
 # Atmosphere
-option.CLOUDS_IN_GI=Nuages & GI
-option.CLOUDS_IN_GI.comment=Permet aux nuages d'impacter la couleur ambiente de la scène. Impacte les performances.
-option.CLOUDS_IN_AMBIENT=Nuages & Lumière Ambiente
-option.CLOUDS_IN_AMBIENT=Les nuages impactent le calcul de la lumière ambiente lointaine. Impacte les performances.
-option.CIRRUS_CLOUDS=Nuages Cirrus
-option.CIRRUS_CLOUDS.comment=Rendre des nuages cirrus (nuage haute altitude et très fin). Beaucoup moins intensifs que les nuages cumulus. Impacte les performances si Nuages & GI et/ou Réflection des nuages sont activés.
-option.CUMULUS_CLOUDS=Nuages Cumulus
-option.CUMULUS_CLOUDS.comment=Render les nuages cumulus. Impacte les performances si Nuages & GI et/ou Réflection des nuages sont activés.
-option.CLOUDS_BLOCKY=Nuages Carrés
-option.CLOUDS_BLOCKY.comment=Dessine les nuages comme des carrés pour garder l'esthétique de Minecraft.
+# Volumetric clouds
+screen.Clouds=Nuages...
+screen.Clouds.comment=Nuages volumétriques : qualité, forme, météo et éclairage
+screen.CloudQuality=Qualité des nuages...
+screen.CloudQuality.comment=Préréglages et réglages fins de performance
+screen.CloudWorld=Forme et météo...
+screen.CloudWorld.comment=Échelle, altitude, couverture, types de nuages, vent
+screen.CloudLighting=Éclairage des nuages...
+screen.CloudLighting.comment=Intensités de lumière reçue par les nuages
+option.VOLUMETRIC_CLOUDS=Nuages volumétriques
+option.VOLUMETRIC_CLOUDS.comment=Active le système de nuages volumétriques.
+option.CLOUD_QUALITY=Qualité
+option.CLOUD_QUALITY.comment=Préréglage de qualité. "Personnalisé" utilise les réglages ci-dessous (pas, échantillons de lumière, etc.).
+value.CLOUD_QUALITY.0=Basse
+value.CLOUD_QUALITY.1=Moyenne
+value.CLOUD_QUALITY.2=Haute
+value.CLOUD_QUALITY.3=Ultra
+value.CLOUD_QUALITY.4=Personnalisée
+option.CLOUD_RES=Résolution de calcul
+option.CLOUD_RES.comment=Complète : chaque pixel est calculé à chaque image (lent). 1/4 par image : un pixel sur quatre est calculé à chaque image puis reconstruit dans le temps (beaucoup plus rapide).
+value.CLOUD_RES.1=Complète
+value.CLOUD_RES.2=1/4 par image
+option.CLOUD_TEMPORAL=Accumulation temporelle
+option.CLOUD_TEMPORAL.comment=Accumule plusieurs images pour réduire le bruit. Peut laisser de légères traînées en mouvement rapide.
+option.CLOUD_MAX_DISTANCE=Distance maximale
+option.CLOUD_MAX_DISTANCE.comment=Distance de rendu des nuages en km (multipliée par l'échelle des nuages).
+option.CLOUD_STEPS=[Perso] Pas dans les nuages
+option.CLOUD_STEPS.comment=Nombre maximal d'échantillons dans les nuages le long d'un rayon. Utilisé seulement en qualité Personnalisée.
+option.CLOUD_LIGHT_STEPS=[Perso] Échantillons de lumière
+option.CLOUD_LIGHT_STEPS.comment=Échantillons vers le soleil pour chaque échantillon de nuage (ombrage interne). Utilisé seulement en qualité Personnalisée.
+option.CLOUD_MS_OCTAVES=[Perso] Octaves de diffusion
+option.CLOUD_MS_OCTAVES.comment=Ordres de diffusion multiple approximés. Utilisé seulement en qualité Personnalisée.
+option.CLOUD_DETAIL_DISTANCE=[Perso] Distance des détails
+option.CLOUD_DETAIL_DISTANCE.comment=Distance (km) jusqu'à laquelle les petits détails sont calculés. Utilisé seulement en qualité Personnalisée.
+option.CLOUD_STEP_SCALE=[Perso] Longueur des pas
+option.CLOUD_STEP_SCALE.comment=Multiplicateur de longueur des pas : plus petit = plus fin et plus lent. Utilisé seulement en qualité Personnalisée.
+option.CLOUD_SCALE=Échelle des nuages
+option.CLOUD_SCALE.comment=Taille de tout ce qui concerne les nuages. 1.0 = échelle réelle (un cumulus fait environ 1 km). Réduire pour un monde de taille vanilla. Le rendu reste identique à toute échelle.
+option.CLOUD_ALTITUDE=Altitude
+option.CLOUD_ALTITUDE.comment=Altitude (Y absolu) de la base des nuages bas.
+option.CLOUD_COVERAGE=Couverture
+option.CLOUD_COVERAGE.comment=Fraction moyenne du ciel couverte par les nuages.
+option.CLOUD_CONVECTION=Convection
+option.CLOUD_CONVECTION.comment=0 = nuages plats en couches, 1 = cumulus hauts en tours.
+option.CLOUD_DENSITY=Densité
+option.CLOUD_DENSITY.comment=Multiplicateur de densité optique.
+option.CLOUD_WEATHER_VARIATION=Variation météo
+option.CLOUD_WEATHER_VARIATION.comment=Ampleur des variations de couverture et de types de nuages dans le ciel et dans le temps.
+option.CLOUD_WIND_SPEED=Vitesse du vent
+option.CLOUD_WIND_SPEED.comment=Vitesse du vent en m/s (multipliée par l'échelle).
+option.CLOUD_WIND_ANGLE=Direction du vent
+option.CLOUD_WIND_ANGLE.comment=Direction du vent en degrés.
+option.CLOUD_EVOLUTION=Évolution
+option.CLOUD_EVOLUTION.comment=Vitesse à laquelle les formes des nuages évoluent.
+option.CLOUD_TIME_SOURCE=Source du temps
+option.CLOUD_TIME_SOURCE.comment=Temps du monde : les nuages suivent le temps de jeu (figés si le cycle jour/nuit est désactivé). Temps réel : les nuages bougent toujours.
+value.CLOUD_TIME_SOURCE.0=Temps du monde
+value.CLOUD_TIME_SOURCE.1=Temps réel
+option.CLOUD_SEED=Graine
+option.CLOUD_SEED.comment=Change complètement la disposition des nuages.
+option.CLOUD_AMBIENT=Lumière du ciel
+option.CLOUD_AMBIENT.comment=Lumière du ciel reçue par les nuages.
+option.CLOUD_SUNLIGHT=Lumière du soleil
+option.CLOUD_SUNLIGHT.comment=Lumière du soleil reçue par les nuages.
+option.CLOUD_GROUND_BOUNCE=Rebond du sol
+option.CLOUD_GROUND_BOUNCE.comment=Albédo du sol pour la lumière renvoyée vers la base des nuages. 0 désactive.
+option.CLOUD_AERIAL_PERSPECTIVE=Perspective atmosphérique
+option.CLOUD_AERIAL_PERSPECTIVE.comment=Voile atmosphérique entre la caméra et les nuages.
+option.CLOUD_DEBUG_VIEW=Vue de debug
+option.CLOUD_DEBUG_VIEW.comment=Aide aux tests : nuages seuls, carte météo vue de dessus (coin bas gauche), coût du raymarching (bleu = faible, rouge = élevé), transmittance.
+value.CLOUD_DEBUG_VIEW.0=Désactivée
+value.CLOUD_DEBUG_VIEW.1=Nuages seuls
+value.CLOUD_DEBUG_VIEW.2=Carte météo
+value.CLOUD_DEBUG_VIEW.3=Coût
+value.CLOUD_DEBUG_VIEW.4=Transmittance
+
 option.GODRAYS=Rayons Crépusculaires
 option.GODRAYS.comment=Rendu de rayons crépusculaires depuis le soleil quand le joueur est hors de l'eau.
 option.GODRAYS_STAINED_GLASS_TINT=Rayons Colorés Teinture Verre
@@ -63,8 +129,6 @@ option.RAY_TRACE_SHADOW=Ombres raytracées
 option.RAY_TRACE_SHADOW.comment=Ombres calculées par lancer de rayons. Permet de gagner en qualité mais ne supporte pas tous les blocs.
 option.SCREEN_SPACE_SHADOW=Ombres Screen-Space
 option.SCREEN_SPACE_SHADOW.comment=Default connection shadow of PTGI, isn't as precise as ray traced shadow, but supports all blocks and entities
-option.CLOUD_SHADOW=Ombre des nuages
-option.CLOUD_SHADOW.comment=Ombre des nuages sur le terrain. Affecte les rayons crépusculaires.
 
 # Lighting
 option.SUNLIGHT_BRIGHTNESS=Intensité du soleil

@@ -28,16 +28,6 @@ screen.Others=其他...
 screen.Others.comment=一些杂项设置
 
 # 大气选项
-option.CLOUDS_IN_GI=天空光照云色计算（光线追踪范围内）
-option.CLOUDS_IN_GI.comment=在光线追踪中计算云的颜色. 关闭后会使光线追踪中的天空光照变蓝
-option.CLOUDS_IN_AMBIENT=天空光照云色计算（光线追踪范围外）
-option.CLOUDS_IN_AMBIENT.comment=在光线追踪范围外的天空光照中计算云的颜色. 关闭后会使光线追踪范围外的天空光照变蓝
-option.CIRRUS_CLOUDS=卷云
-option.CIRRUS_CLOUDS.comment=高空中较为稀薄的云
-option.CUMULUS_CLOUDS=积云
-option.CUMULUS_CLOUDS.comment=较低并且厚实的云
-option.CLOUDS_BLOCKY=方块云
-option.CLOUDS_BLOCKY.comment=让云层的分布看起来更有方块感
 option.GODRAYS=体积光
 option.GODRAYS.comment=阳光在大气中产生的立体光束. 不会影响水下的体积光
 option.GODRAYS_STAINED_GLASS_TINT=染色体积光
@@ -64,8 +54,6 @@ option.RAY_TRACE_SHADOW=光线追踪阴影
 option.RAY_TRACE_SHADOW.comment=使用光线追踪的衔接阴影，衔接准确性极佳但是不支持部分方块. 建议在屏幕空间阴影开启时关闭以减少性能消耗
 option.SCREEN_SPACE_SHADOW=屏幕空间阴影
 option.SCREEN_SPACE_SHADOW.comment=PTGI默认的衔接阴影，准确性不佳但支持所有不透明方块. 建议在开启时关闭光线追踪阴影以减少性能消耗
-option.CLOUD_SHADOW=云影
-option.CLOUD_SHADOW.comment=云遮挡阳光产生的阴影. 同时影响体积光中是否计算云
 
 # 光照选项
 option.SUNLIGHT_BRIGHTNESS=日光亮度

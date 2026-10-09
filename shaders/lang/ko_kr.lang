@@ -28,16 +28,6 @@ screen.Others=기타
 screen.Others.comment=일부 추가 설정
 
 # 대기
-option.CLOUDS_IN_GI=GI에서 구름
-option.CLOUDS_IN_GI.comment=GI 빛 추적에서 구름을 고려할지 여부. 성능의 대가로 구름이 주변 조명 색상에 영향을 미치도록 허용합니다.
-option.CLOUDS_IN_AMBIENT=환경 조명에서 구름
-option.CLOUDS_IN_AMBIENT.comment=멀리 떨어진 거리의 환경 조명에서 구름을 고려할지 여부. 성능의 대가로 레이트레이싱의 가장자리에서 더 나은 연결을 얻을 수 있습니다.
-option.CIRRUS_CLOUDS=권운
-option.CIRRUS_CLOUDS.comment=권운을 그릴지 여부입니다. 적운보다는 성능에 덜 영향을 미칩니다. 그러나 GI에서 구름이나 반사에서 구름을 사용하는 경우 성능에 영향을 미칩니다.
-option.CUMULUS_CLOUDS=적운
-option.CUMULUS_CLOUDS.comment=적운을 그릴지 여부. 성능에 영향을 미칩니다, 특히 GI에서 구름이나 반사에서 구름을 사용하는 경우 더욱 그렇습니다.
-option.CLOUDS_BLOCKY=사각형 구름
-option.CLOUDS_BLOCKY.comment= 마인크래프트같은 느낌을 내기 위해, 쿠뮬러스 구름을 블록 모양으로 그릴지 여부를 결정합니다.
 option.GODRAYS=대기 갓레이
 option.GODRAYS.comment=해당 설정은 물 아래가 아닐 때 태양광의 볼륨 라이팅(갓레이)을 활성화합니다.
 option.GODRAYS_STAINED_GLASS_TINT=갓레이 유리 색 적용
@@ -61,8 +51,6 @@ option.RAY_TRACE_SHADOW=레이트레이싱 그림자
 option.RAY_TRACE_SHADOW.comment=레이트레이싱 그림자, 정확한 연결 그림자를 얻을 수 있지만 일부 블록을 지원하지 않습니다.
 option.SCREEN_SPACE_SHADOW=스크린 스페이스 그림자
 option.SCREEN_SPACE_SHADOW.comment=PTGI의 기본 연결 그림자, 레이트레이싱 그림자만큼 정확하지는 않지만 모든 블록과 엔티티를 지원합니다.
-option.CLOUD_SHADOW=구름 그림자
-option.CLOUD_SHADOW.comment=구름 그림자. 갓레이에 영향을 미칩니다.
 
 
 # Lighting

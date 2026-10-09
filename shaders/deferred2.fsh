@@ -133,9 +133,6 @@ const float RAY_TRACING_RADIUS = RAY_TRACING_DIAMETER / 2.0;
        float waterDepth=texture2DLod(shadowcolor1,vec2(t.xy-vec2(0.,.5)),3).x*256.0-(i.y+cameraPosition.y);
        r/=sqrt(waterDepth)+1.;
      }
-   #ifdef CLOUD_SHADOW
-   r*=CloudShadow(i+y*.99,worldLightVector);
-   #endif
    return r*(1.-wetness);
  }
  struct awIafiSlNY{float mwtAZpOIMX;float KZGLOOTLva;float yDFXZDbcEk;float cvVAxIXMRt;vec3 jbwXZaPXmq;};
@@ -276,9 +273,6 @@ const float RAY_TRACING_RADIUS = RAY_TRACING_DIAMETER / 2.0;
                P*=saturate(D.y*10.+1.);
                P=DoNightEyeAtNight(P*12.,timeMidnight)*.083333;
                vec3 Y=P,b=Y;
-               #ifdef CLOUDS_IN_GI
-               CloudPlane(Y,vec3(0.),-R.direction,worldLightVector,worldSunVector,colorSunlight,colorSkyUp,b,timeMidnight,false);
-               #endif
                Y=TintUnderwaterDepth(Y*s);
                a+=Y*.1*stainedColor;
                break;

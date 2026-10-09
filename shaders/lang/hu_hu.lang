@@ -28,16 +28,6 @@ screen.Others=Más...
 screen.Others.comment=Néhány másik beállítás.
 
 # Atmosphere
-option.CLOUDS_IN_GI=Felhők a GI-ban
-option.CLOUDS_IN_GI.comment=Vajon beleszámítsa-e a felhőket a Globális Megvilágításba (GI). Lehetővé teszi a felhők számára a környezeti megvilágításra való kihatást a teljesítmény árán.
-option.CLOUDS_IN_AMBIENT=Felhők a környezetben
-option.CLOUDS_IN_AMBIENT.comment=Vajon beleszámítsa-e a messzi felhőket a környezeti megvilágításba. Jobb kapcsolatot létesít a ray tracing határán a teljesítmény árán.
-option.CIRRUS_CLOUDS=Pehelyfelhő
-option.CIRRUS_CLOUDS.comment=Vajon láthatóak legyenek-e a Pehelyfelhők. Nem annyira teljesítményigényesek, mint a gomolyfelhők, de kihatással lehetnek rá, különösen akkor, ha a "Felhők a GI-ban" és/vagy a "Felhők a tükröződésekben" opciók be vannak kapcsolva.
-option.CUMULUS_CLOUDS=Gomolyfelhők
-option.CUMULUS_CLOUDS.comment=Vajon legyenek e gomolyfelhők. Teljesítményigényes, különösen akkor, ha a "Felhők a GI-ban" és/vagy a "Felhők a tükröződésekben" opciók be vannak kapcsolva.
-option.CLOUDS_BLOCKY=Blokkos felhők
-option.CLOUDS_BLOCKY.comment=Legyenek-e a gomolyfelhők szögletesek, kubikáklisak. Egy kis Minecraftos érzetet kelt.
 option.GODRAYS=Atmoszférikus napsugarak
 option.GODRAYS.comment=Lehetővé teszi a volumetrikus napsugarak megjelenését, amikor nem vagy víz alatt.
 option.GODRAYS_STAINED_GLASS_TINT=Napsugarak szinezett üvegen át festése.
@@ -63,8 +53,6 @@ option.RAY_TRACE_SHADOW=Ray Tracelt árnyákok
 option.RAY_TRACE_SHADOW.comment=Ray Tracelt árnyék, nagyon pontos, de nem támogat egyes blokkokat.
 option.SCREEN_SPACE_SHADOW=Képtéri árnyékok
 option.SCREEN_SPACE_SHADOW.comment=Alapértelmezett kapcsolati árnyékok, nem olyan precíz, mint a Ray Tracelt árnyékok, de minden blokkot és entitást támogat.
-option.CLOUD_SHADOW=Felhőárnyék
-option.CLOUD_SHADOW.comment=Felhők árnyékai. A napsugarakra is hatással van.
 
 # Lighting
 option.SUNLIGHT_BRIGHTNESS=Napfény-erősség

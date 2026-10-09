@@ -1,9 +1,5 @@
 // Atmosphere
-#define CLOUDS_IN_GI
-#define CLOUDS_IN_AMBIENT
-#define CIRRUS_CLOUDS
-#define CUMULUS_CLOUDS
-#define CLOUDS_BLOCKY
+#include "/lib/clouds/CloudSettings.inc"
 #define GODRAYS
 #define GODRAYS_STAINED_GLASS_TINT
 #define VOLUMETRIC_LIGHT_STRENGTH 1.0 // [0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0 2.5 3.0 3.5 4.0 4.5 5.0]
@@ -12,7 +8,6 @@
 #define SHADOW_MAP_BIAS 0.9 // [0.8 0.82 0.84 0.86 0.88 0.9 0.92 0.94 0.96 0.98]
 #define RAY_TRACE_SHADOW
 #define SCREEN_SPACE_SHADOW
-// #define CLOUD_SHADOW
 #define SUNLIGHT_LEAK_FIX
 
 // Lighting
