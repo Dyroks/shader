@@ -4,8 +4,15 @@
 //  cloudSkyCapture (begin_g.csh): sky + clouds radiance for every direction, octahedral map
 //    (512^2, y up). rgb = radiance in SkyShading units, a = cloud transmittance (to hide
 //    the sun disc behind clouds). Used by the GI, the sky ambient (SH) and the reflections.
-//  cloudShadow (begin_h.csh): transmittance of the clouds along the light, stored on the
-//    horizontal plane of the cloud layer bottom, centred on the camera.
+//  cloudShadow (begin_h.csh): light space "Beer shadow map" of the clouds (UE style), 2
+//    cascades side by side (1024x512): near 512^2 over +-16 km, far 512^2 over +-80 km (scaled).
+//    Texels lie on the plane through the camera normal to the light, each one stores along
+//    its light ray (s = distance toward the light, scaled km, camera relative):
+//      x = sMax: cloud entry on the light side, y = sMin: last cloud on the far side,
+//      z = optical depth of the low + mid clouds, w = optical depth of the high layer.
+//    The optical depth ahead of a point (toward the light) is z * (sMax - s) / (sMax - sMin),
+//    clamped: correct below / behind / above the clouds, linear inside. Works at any altitude
+//    and for a light on the horizon (sunset crepuscular rays).
 //
 //  Lookups only need cameraPosition and worldLightVector (or an explicit light vector).
 // =====================================================================================
@@ -14,9 +21,9 @@
 #define CLOUD_SKY_INC
 
 const float cloudSkyCaptureSize = 512.0;
-const float cloudShadowSize     = 512.0;
-const float cloudShadowTexel    = 64.0 * CLOUD_SCALE;
-const float cloudShadowPlane    = float(CLOUD_ALTITUDE) - 0.45 * 1000.0 * CLOUD_SCALE;   // = cloudLayerBottom
+const float cloudShadowSize     = 512.0;   // per cascade
+const float cloudShadowTexelNear = 62.5 * CLOUD_SCALE;
+const float cloudShadowTexelFar  = 312.5 * CLOUD_SCALE;
 
 // Octahedral mapping of the unit sphere, y up
 vec2 CloudOctEncode(vec3 n) {
@@ -38,8 +45,18 @@ vec3 CloudOctDecode(vec2 uv) {
 	return normalize(n);
 }
 
-vec2 CloudShadowOrigin() {
-	return floor(cameraPosition.xz / cloudShadowTexel) * cloudShadowTexel;
+// Light space basis (L: toward the light). The sun moves in the x-y plane (tilted by the sun
+// path rotation): the cross product with z never vanishes.
+void CloudShadowBasis(vec3 L, out vec3 U, out vec3 V) {
+	U = normalize(cross(L, vec3(0.0, 0.0, 1.0)));
+	V = cross(U, L);
+}
+
+// Offset of the texel grid of a cascade from the camera, in light space (u, v): the grid is
+// snapped to whole texels in world space (no shimmering when the camera moves)
+vec2 CloudShadowGridOffset(vec3 U, vec3 V, float texel) {
+	vec2 cam = vec2(dot(cameraPosition, U), dot(cameraPosition, V));
+	return floor(cam / texel) * texel - cam;
 }
 
 #ifdef CLOUD_SKY_LOOKUPS
@@ -51,15 +68,76 @@ vec4 CloudSkyLookup(vec3 dir) {
 	return textureLod(cloudSkyCaptureSampler, CloudOctEncode(dir), 0.0);
 }
 
-// Transmittance of the clouds between a camera relative position and the light
+// Optical depth ahead of point s (scaled km along the light) from one texel
+float CloudShadowTexelOD(vec4 t, float s, bool belowHigh) {
+	float od = t.z * CloudSat((t.x - s) / max(t.x - t.y, 0.02));
+	return od + (belowHigh ? t.w : 0.0);
+}
+
+// Light space frame of the shadow map for a light direction (computed once, reused for many lookups)
+struct CloudShadowFrame {
+	vec3 L, U, V;
+	vec2 offNear, offFar;
+};
+
+CloudShadowFrame CloudShadowMakeFrame(vec3 L) {
+	CloudShadowFrame f;
+	f.L = L;
+	CloudShadowBasis(L, f.U, f.V);
+	f.offNear = CloudShadowGridOffset(f.U, f.V, cloudShadowTexelNear);
+	f.offFar = CloudShadowGridOffset(f.U, f.V, cloudShadowTexelFar);
+	return f;
+}
+
+// Texel coordinates of a camera relative position: xy = continuous texel position in the
+// atlas, z = s (scaled km), w = cascade weight (0 = outside every cascade)
+vec4 CloudShadowCoords(CloudShadowFrame f, vec3 relPos) {
+	vec2 uv = vec2(dot(relPos, f.U), dot(relPos, f.V));
+	float s = dot(relPos, f.L) / cloudKm;
+	vec2 fn = (uv - f.offNear) / cloudShadowTexelNear + cloudShadowSize * 0.5;
+	if (all(greaterThan(fn, vec2(1.0))) && all(lessThan(fn, vec2(cloudShadowSize - 1.0))))
+		return vec4(fn, s, 1.0);
+	vec2 ff = (uv - f.offFar) / cloudShadowTexelFar + cloudShadowSize * 0.5;
+	float edge = min(min(ff.x, ff.y), cloudShadowSize - max(ff.x, ff.y));
+	return vec4(ff + vec2(cloudShadowSize, 0.0), s, CloudSat(edge / 8.0 - 0.25));
+}
+
+// Optical depth of the clouds between a camera relative position and the light (direct light
+// attenuation). jitter (texels, -0.5..0.5): nearest texel lookup with a stochastic offset
+// (filtered by temporal accumulation); without it, bilinear filtering of the result (4 taps).
+float CloudShadowOpticalDepth(CloudShadowFrame f, vec3 relPos, vec2 jitter, bool stochastic) {
+	vec4 c = CloudShadowCoords(f, relPos);
+	if (c.w <= 0.0) return 0.0;
+	bool belowHigh = cameraPosition.y + relPos.y < cloudHighAlt;
+	float od;
+	if (stochastic) {
+		od = CloudShadowTexelOD(texelFetch(cloudShadowSampler, ivec2(c.xy + jitter), 0), c.z, belowHigh);
+	} else {
+		vec2 p = c.xy - 0.5;
+		ivec2 i = ivec2(floor(p));
+		vec2 f = p - vec2(i);
+		float a = CloudShadowTexelOD(texelFetch(cloudShadowSampler, i, 0), c.z, belowHigh);
+		float b = CloudShadowTexelOD(texelFetch(cloudShadowSampler, i + ivec2(1, 0), 0), c.z, belowHigh);
+		float d = CloudShadowTexelOD(texelFetch(cloudShadowSampler, i + ivec2(0, 1), 0), c.z, belowHigh);
+		float e = CloudShadowTexelOD(texelFetch(cloudShadowSampler, i + ivec2(1, 1), 0), c.z, belowHigh);
+		// filter the transmittance, not the optical depth (soft shadow edges)
+		float T = mix(mix(exp(-a), exp(-b), f.x), mix(exp(-d), exp(-e), f.x), f.y);
+		od = -log(max(T, 1e-6));
+	}
+	return od * c.w;
+}
+
+// Light that goes through the clouds: direct transmittance + light that diffused through
+// them (thin clouds and cloud edges let some light through, thick cumulus cast dark shadows)
+float CloudShadowTransmittance(float od) {
+	float direct = exp(-od);
+	return direct + (1.0 - direct) * 0.2 * exp(-od * 0.13);
+}
+
+// Transmittance of the clouds between a camera relative position and the light (terrain, GI)
 float CloudShadowLookup(vec3 relPos, vec3 L) {
-	if (L.y < 0.03) return 1.0;
-	float y = cameraPosition.y + relPos.y;
-	vec2 q = relPos.xz + L.xz * ((cloudShadowPlane - y) / L.y);
-	vec2 uv = (cameraPosition.xz - CloudShadowOrigin() + q) / (cloudShadowTexel * cloudShadowSize) + 0.5;
-	vec2 e = abs(uv - 0.5);
-	float fade = CloudSat((0.5 - max(e.x, e.y)) * 20.0) * CloudSat((L.y - 0.03) * 20.0);
-	return mix(1.0, textureLod(cloudShadowSampler, uv, 0.0).r, fade);
+	if (L.y < -0.05) return 1.0;
+	return CloudShadowTransmittance(CloudShadowOpticalDepth(CloudShadowMakeFrame(L), relPos, vec2(0.0), false));
 }
 #endif
 

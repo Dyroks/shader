@@ -361,3 +361,11 @@ option.SKYLIGHT_FIX=En développement: Correction lumière du ciel
 option.SKYLIGHT_FIX.comment=Tente de corriger le mauvais niveau de lumière provenant du ciel autour d'objets opaques qui émettent de la lumière après Minecraft 1.14.
 option.WEATHER=Météo
 option.WEATHER.comment=Dessine la pluie et la neige. Encore en développement et buggé.
+option.CREPUSCULAR_RAYS=Rayons crépusculaires
+option.CREPUSCULAR_RAYS.comment=Ombres des nuages dans l'air : faisceaux de lumière entre les nuages, rayons en éventail au coucher du soleil, rayons anticrépusculaires convergeant à l'opposé du soleil. Nécessite l'atmosphère physique et les ombres des nuages.
+option.CREPUSCULAR_STRENGTH=Intensité des rayons
+option.CREPUSCULAR_STRENGTH.comment=100 % = physique (les rayons dépendent aussi de la brume). Plus haut = faisceaux d'ombre plus sombres, plus spectaculaire, jamais plus sombre qu'un air sans lumière directe.
+option.CREPUSCULAR_STEPS=Qualité des rayons
+option.CREPUSCULAR_STEPS.comment=Échantillons le long de chaque rayon de vue. Plus = moins de bruit en mouvement, plus lent.
+option.CREPUSCULAR_DISTANCE=Distance des rayons
+option.CREPUSCULAR_DISTANCE.comment=Distance maximale des rayons en km (× échelle). Les rayons du coucher de soleil demandent de grandes distances.

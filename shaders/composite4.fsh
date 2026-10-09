@@ -30,6 +30,10 @@ flat in vec3 colorSkyUp;
 flat in vec3 cloudSkyAmbient;
 #include "/lib/clouds/CloudLookups.inc"
 #include "/lib/clouds/CloudComposite.inc"
+#if defined CREPUSCULAR_RAYS && defined CLOUD_SHADOWS && ATMOSPHERE_MODEL == 1
+#define CREPUSCULAR_ACTIVE
+#include "/lib/atmosphere/Crepuscular.inc"
+#endif
 #endif
 
 
@@ -123,6 +127,9 @@ vec3 WorldPosToShadowProjPos(vec3 worldPos)
    U=mix(U,e.xyz,saturate(T));
    if(d.sky<.5)
      U+=E*v.metalness;
+   // light shafts of the pack (terrain shadows, close range): added after the clouds, the air
+   // they light lies in front of them
+   vec3 vlAdd=vec3(0.);
    if(wetness<.99)
      {
        #ifdef GODRAYS
@@ -133,6 +140,10 @@ vec3 WorldPosToShadowProjPos(vec3 worldPos)
          {
            float H=BlueNoiseTemporal(texcoord.xy).x,N=100.;
            vec3 C=vec3(0.),Q=gbufferModelViewInverse[3].xyz;
+           #if defined VOLUMETRIC_CLOUDS && defined CLOUD_SHADOWS
+           CloudShadowFrame cloudShadowFrame=CloudShadowMakeFrame(worldLightVector);
+           vec2 cloudShadowJitter=BlueNoiseTemporal(texcoord.xy).yz-.5;
+           #endif
            vec3 Temp=c.xyz*N;
            for(int M=0;M<32;M++)
              {
@@ -157,7 +168,7 @@ vec3 WorldPosToShadowProjPos(vec3 worldPos)
                  }
                #endif
                #if defined VOLUMETRIC_CLOUDS && defined CLOUD_SHADOWS
-               Z*=CloudShadowLookup(W.xyz,worldLightVector);
+               Z*=CloudShadowTransmittance(CloudShadowOpticalDepth(cloudShadowFrame,W.xyz,cloudShadowJitter,true));
                #endif
                if(eyeInWater)
                  {
@@ -191,15 +202,24 @@ vec3 WorldPosToShadowProjPos(vec3 worldPos)
              }
            float j=PhaseMie(.8,vlStrength,vlStrength*vlStrength+1.);
            vec3 vl=TintUnderwaterDepth(C*SUNLIGHT_BRIGHTNESS*colorSunlight*vec3(0.046, 0.05175, 0.0575)*j*K*(1.-wetness));
-           U+=vl*VOLUMETRIC_LIGHT_STRENGTH;
+           vlAdd=vl*VOLUMETRIC_LIGHT_STRENGTH;
          }
      }
    if(d.sky<.5&&isEyeInWater<1)
      LandAtmosphericScattering(U,i.xyz,c.xyz,worldSunVector.xyz);
    #ifdef VOLUMETRIC_CLOUDS
    if(isEyeInWater==0)
-     CloudComposite(U,c.xyz,texcoord.xy,cloudSkyAmbient);
+     {
+       vec2 cloudTD;
+       CloudComposite(U,c.xyz,texcoord.xy,cloudSkyAmbient,cloudTD);
+       #ifdef CREPUSCULAR_ACTIVE
+       // crepuscular rays: remove the light the air in the shadow of the clouds does not scatter
+       vec3 crep=CrepuscularShadowedLight(c.xyz,CloudSurfaceDistance(texcoord.xy),cloudTD,BlueNoiseTemporal(texcoord.xy))*cloudToComposite;
+       U=CrepuscularApply(U,crep);
+       #endif
+     }
    #endif
+   U+=vlAdd;
    U/=120.;
    U*=exp(-r*blindness);
    U=pow(U.xyz,vec3(.454545));

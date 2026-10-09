@@ -364,3 +364,11 @@ option.SKYLIGHT_FIX=Experimental: Sky Light Fix
 option.SKYLIGHT_FIX.comment=Experimental option, try to fix the wrong skylight level around opaque emitting blocks after Minecraft 1.14
 option.WEATHER=Weather
 option.WEATHER.comment=Rendering rain and snow. Experimental and buggy
+option.CREPUSCULAR_RAYS=Crepuscular Rays
+option.CREPUSCULAR_RAYS.comment=Shadows of the clouds in the air: shafts of light between clouds, sunset rays fanning out over the sky, anticrepuscular rays converging opposite the sun. Needs the physical atmosphere and cloud shadows.
+option.CREPUSCULAR_STRENGTH=Rays Strength
+option.CREPUSCULAR_STRENGTH.comment=100 % = physical (the rays also depend on the haze). Higher = darker shadow shafts, more spectacular, never darker than air without direct light.
+option.CREPUSCULAR_STEPS=Rays Quality
+option.CREPUSCULAR_STEPS.comment=Samples along each view ray. More = less noise in motion, slower.
+option.CREPUSCULAR_DISTANCE=Rays Distance
+option.CREPUSCULAR_DISTANCE.comment=Maximum distance of the rays in km (scaled). Sunset rays need long distances.

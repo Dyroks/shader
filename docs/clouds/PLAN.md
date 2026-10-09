@@ -14,7 +14,8 @@ Base du pack : SEUS PTGI HRR 2.1 GFME, Iris 1.11.7, Minecraft 26.3, Voxy.
 | 4 | Atmosphère Hillaire 2020 (tables précalculées), remplacement du ciel SEUS, option SEUS/Hillaire | ✅ testée en jeu (« beaucoup mieux que SEUS ») |
 | 5 | Variété : couches moyennes et hautes (Ac, As, Ci, Cs, Cc), cumulonimbus et enclume, régimes météo, éclairs | ✅ testée en jeu (« très bon », pas de problème) |
 | 6 | Accélération (révisée après mesures : saut hiérarchique des zones vides), intérieur et nuages proches | ✅ testée en jeu (meilleures performances, intérieur des nuages bon) |
-| 7 | Forme et éclairage des cumulus (retour : trop ronds, adoucis, blancs partout) : forme en chou-fleur, surface trouvée précisément, éclairage calibré sur une référence par path tracing, 2 bugs anciens corrigés | 🧪 à tester en jeu |
+| 7 | Forme et éclairage des cumulus (retour : trop ronds, adoucis, blancs partout) : forme en chou-fleur, surface trouvée précisément, éclairage calibré sur une référence par path tracing, 2 bugs anciens corrigés | ✅ testée en jeu (« beaucoup mieux », assombrissement brusque sous la couche moyenne corrigé ensuite) |
+| 8 | Rayons crépusculaires : nouvelle carte d'ombre des nuages en espace lumière (2 cascades, ±80 km), ombre des nuages dans l'air intégrée avec l'atmosphère physique | 🧪 à tester en jeu |
 
 La bibliothèque de nuages simulés (prévue en phase 7) est écartée : formes figées et répétitives (décision de l'utilisateur).
 
@@ -52,6 +53,25 @@ Référence : 50-60 FPS à l'arrêt, environ 45 en mouvement, sans nuages.
 
 - **Test 3** : le fantôme sur les surfaces proches est corrigé. Les reflets au centre de l'écran fonctionnent à
   l'arrêt mais traînaient pendant les rotations : corrigé par la reprojection (à confirmer).
+
+## Phase 8 : rayons crépusculaires
+
+**Objectif** : rayons « réalistes et spectaculaires » : faisceaux entre les nuages (échelles de Jacob), rayons en
+éventail au coucher du soleil, rayons anticrépusculaires, ombres des nuages dans la brume vue d'un sommet ou d'avion.
+
+**Principe physique** : le ciel (table de vue du ciel) et la perspective atmosphérique supposent un air éclairé partout.
+L'air à l'ombre d'un nuage ne diffuse pas la lumière directe du soleil : on intègre, le long du rayon de vue, la
+diffusion simple (Rayleigh + Mie, vraies fonctions de phase, transmittance vers le soleil) de l'air à l'ombre, et on
+la retire de la scène. Les rayons apparaissent par contraste, sans aucun effet en espace écran : ils existent hors
+champ du soleil, derrière la caméra (anticrépusculaires), et autour des nuages qui cachent le soleil.
+
+| Élément | Implémentation |
+|---|---|
+| **Carte d'ombre** (`begin_h`, remplace l'ancienne) | « Beer shadow map » en espace lumière (technique d'Unreal Engine) : texels sur le plan normal à la lumière passant par la caméra, 2 cascades dans une image 1024×512 rgba16f (proche ±16 km, texels 62,5 m ; lointaine ±80 km, texels 312 m, rafraîchie une ligne sur deux par image). Chaque texel stocke l'entrée des nuages côté lumière, la sortie, leur profondeur optique, et celle des cirrus. Profondeur optique devant un point = linéaire entre l'entrée et la sortie. Marche de 150 km le long de la lumière avec des pas qui grandissent avec la distance (soleil rasant : les nuages lointains projettent les rayons du soir). Corrige aussi l'ancienne carte : ombres justes à toute altitude (sommets dans la couche de nuages), ombres portées jusqu'à l'horizon et jusqu'au coucher du soleil (l'ancienne s'éteignait sous 1,7°). |
+| **Intégration** (`lib/atmosphere/Crepuscular.inc`, `composite4`) | 24 pas (option) répartis quadratiquement jusqu'à 100 km (option) ou jusqu'au sommet de la couche de nuages, gigue stratifiée filtrée par le TAA. Lumière retirée devant les nuages, et derrière eux × leur transmittance. La lumière diffusée à travers les nuages fins éclaire encore l'air dessous (isotrope). La nuit : lune. Soustraction bornée sans changer la teinte. |
+| **Intensité** (`CREPUSCULAR_STRENGTH`, 150 %) | 100 % = physique (dépend de la brume, *Brume*). Au-delà, les faisceaux d'ombre sont plus sombres, mais jamais plus que de l'air sans lumière directe (pas de trous noirs). |
+| **Rayons du pack** | Les rayons proches (ombres du relief, carte d'ombre du pack) sont conservés, mais ajoutés après les nuages (avant, ils étaient atténués par les nuages situés derrière eux) ; leur lecture de l'ombre des nuages passe à une lecture unique par pas. |
+| **Coût** (hors jeu) | Intégration ≈ +13 % du temps de la marche des nuages à résolution égale ; en jeu elle tourne à pleine résolution interne (×4 pixels par rapport à la marche en damier) : ordre de grandeur, la moitié du coût des nuages. Carte d'ombre ≈ 2 × l'ancienne. À mesurer en jeu ; *Qualité des rayons* 16 pour économiser. |
 
 ## Phase 7 : forme et éclairage des cumulus
 
@@ -172,11 +192,12 @@ composite4.fsh   composition             couleurs du soleil et du ciel, perspect
 | `shaders/lib/clouds/CloudUniforms.inc` | uniforms des compute shaders (qui n'incluent pas `Common.inc`) |
 | `shaders/lib/clouds/CloudComposite.inc` | composition dans `composite4.fsh`, vues de debug |
 | `shaders/lib/clouds/CloudShading.inc` | couleur des nuages à partir du raymarching (partagé par la composition et la capture du ciel) |
-| `shaders/lib/clouds/CloudSky.inc`, `CloudLookups.inc` | capture du ciel et carte d'ombre : encodage et lectures pour les passes du pack |
+| `shaders/lib/clouds/CloudSky.inc`, `CloudLookups.inc` | capture du ciel et carte d'ombre en espace lumière (2 cascades) : encodage et lectures pour les passes du pack |
 | `shaders/lib/atmosphere/SkySEUS.inc` | fonctions de ciel SEUS, sorties de `Common.inc` pour être utilisables en compute (option *Atmosphère* = SEUS) |
 | `shaders/lib/atmosphere/Atmosphere.inc` | atmosphère physique : paramètres, paramétrisations des tables, intégration, ciel, perspective atmosphérique |
 | `shaders/lib/atmosphere/Sky.inc` | points d'entrée du pack (`SkyShading`, `SkyTransmittance`), aiguillage SEUS / physique |
-| `shaders/lib/atmosphere/AtmosphereSettings.inc` | options de l'atmosphère |
+| `shaders/lib/atmosphere/AtmosphereSettings.inc` | options de l'atmosphère et des rayons crépusculaires |
+| `shaders/lib/atmosphere/Crepuscular.inc` | rayons crépusculaires : diffusion simple de l'air à l'ombre des nuages |
 | `shaders/textures/clouds/*.dat` | bruits 3D tuilables (Perlin-Worley 128³, Worley 64³, curl 128²) et texture de cirrus 512², générés par `tools/gen_cloud_noise.py` |
 
 ### Modèle de nuages
@@ -231,6 +252,9 @@ composite4.fsh   composition             couleurs du soleil et du ciel, perspect
 - Éclairage calibré : de face (soleil dans le dos), le bord des nuages reste un peu trop clair et le centre un peu trop
   sombre (erreur ~20-30 % sur ce cas) : il faudrait connaître l'épaisseur de nuage derrière chaque point.
 - Les grands nuages lointains (> 15 km) gardent parfois des stries verticales sur leurs flancs (empreinte 2D).
+- Rayons crépusculaires : après le coucher du soleil, la lumière des ombres passe à la lune (choix d'Iris) : pas de
+  rayons du soleil sous l'horizon. Les réflexions et la GI ne voient pas les rayons. Le relief ne projette des rayons
+  que dans la portée de la carte d'ombre du pack (rayons proches), pas les montagnes lointaines de Voxy.
 
 ## Protocole de test en jeu
 
@@ -256,6 +280,12 @@ composite4.fsh   composition             couleurs du soleil et du ciel, perspect
      Précédente / Chou-fleur et *Modèle d'éclairage* Précédent / Calibré ; essayer *Lobes des cumulus* 0,5 à 1,5.
      Vérifier : pas de formes qui sautent avec le vent (attendre quelques minutes), pas de bruit nouveau sur les bords.
      FPS avec chaque combinaison.
+   - S11 (phase 8) : `/time set 12500` (coucher), ciel *Cumulus bourgeonnants* puis *Cumulus et altocumulus* : regarder
+     vers le soleil depuis le sol, puis depuis un sommet ; se retourner (rayons anticrépusculaires) ; `/time set 6000`
+     face au soleil sous des nuages épars ; voler au-dessus de la couche. Comparer *Rayons crépusculaires* activés /
+     désactivés et *Intensité des rayons* 100 / 150 / 250 %, *Brume* 3 / 4. Vérifier le bruit en mouvement (*Qualité
+     des rayons*) et les FPS. Vérifier aussi les ombres des nuages sur le relief au coucher du soleil (elles portent
+     maintenant jusqu'au soleil rasant).
    - S8 (phase 4) : comparer *Atmosphère* SEUS / Physique à midi, au coucher du soleil, au crépuscule (`/time set 12800`),
      la nuit, sous la pluie, depuis un sommet (brume sur le relief lointain de Voxy, qui doit se fondre dans le ciel à
      l'horizon) et en vol très haut. FPS SEUS contre Physique.
@@ -277,7 +307,7 @@ python3 tools/cloud_preview.py out.png --scene sunset # rendu hors-jeu des nuage
 python3 tools/cloud_preview.py out.png --scene noon -O CLOUD_REGIME=4      # un type de ciel fixé
 python3 tools/cloud_preview.py out.png --thunder 1 --wetness 0.5 --day 3   # orage, jour du monde
 python3 tools/cloud_preview.py out.png --sun -30 --thunder 1 --bolt 1500 -56 -6000   # éclair vanilla
-CLOUD_TIMING=1 python3 tools/cloud_preview.py out.png   # temps du raymarching (rapports seulement)
+CLOUD_TIMING=1 python3 tools/cloud_preview.py out.png   # temps : carte d'ombre, raymarching, composition + rayons (rapports seulement)
 python3 tools/cloud_preview.py out.png --scene sunset --key 0.0011 -O ATMOSPHERE_MODEL=0   # exposition fixe, ciel SEUS
 ATMO_DEBUG=dir python3 tools/cloud_preview.py out.png   # enregistre les tables de l'atmosphère (.npy)
 CLOUD_DUMP_WEATHER=dir python3 tools/cloud_preview.py out.png   # enregistre les cartes météo (.npy)

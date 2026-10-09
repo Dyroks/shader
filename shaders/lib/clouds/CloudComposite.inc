@@ -123,8 +123,10 @@ bool CloudPossible(vec3 worldDir, float surfaceDist) {
 // worldDir: normalised camera to pixel direction
 // tc      : internal texture coordinate (0..0.5)
 // skyAmbient: average sky radiance (deferred12 units)
-void CloudComposite(inout vec3 color, vec3 worldDir, vec2 tc, vec3 skyAmbient) {
+// cloudTD : x = transmittance of the clouds, y = their distance (blocks, 1e9 if none)
+void CloudComposite(inout vec3 color, vec3 worldDir, vec2 tc, vec3 skyAmbient, out vec2 cloudTD) {
 	ivec2 px = ivec2(tc * vec2(viewWidth, viewHeight));
+	cloudTD = vec2(1.0, 1e9);
 	#if CLOUD_DEBUG_VIEW != 2 && CLOUD_DEBUG_VIEW != 3
 		if (!CloudPossible(worldDir, CloudSurfaceDistance(tc))) {
 			#if CLOUD_DEBUG_VIEW == 1
@@ -139,6 +141,7 @@ void CloudComposite(inout vec3 color, vec3 worldDir, vec2 tc, vec3 skyAmbient) {
 	vec4 hist = CloudHistory(px, true);
 	float T = CloudSat(hist.z);
 	float depth = CloudDepthAt(px);
+	cloudTD = vec2(T, depth);
 	vec3 cloudColor = CloudShade(hist.xyz, depth, worldDir, cameraPosition.y, worldSunVector, colorSunlight, skyAmbient);
 	cloudColor = DoNightEyeAtNight(cloudColor, timeMidnight) + CloudLightning(worldDir * depth, T);
 

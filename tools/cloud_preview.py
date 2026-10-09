@@ -124,6 +124,10 @@ vec3 SkyAmbient() {
 
 #include "/lib/clouds/CloudLookups.inc"
 #include "/lib/clouds/CloudComposite.inc"
+#if defined CREPUSCULAR_RAYS && defined CLOUD_SHADOWS && ATMOSPHERE_MODEL == 1
+#include "/lib/atmosphere/Crepuscular.inc"
+#endif
+uniform sampler2D noisetex;
 uniform int showCapture;
 
 void main() {
@@ -160,12 +164,18 @@ void main() {
 		n += RenderSunDisc(dir, worldSunVector, colorSunlight) * SkyTransmittance(dir) * 2000.0;
 	}
 	vec3 U = n * 0.12;
-	CloudComposite(U, dir, tc, skyAmb);
+	vec2 cloudTD;
+	CloudComposite(U, dir, tc, skyAmb, cloudTD);
+	#if defined CREPUSCULAR_RAYS && defined CLOUD_SHADOWS && ATMOSPHERE_MODEL == 1
+		vec3 nz = fract(texelFetch(noisetex, px & 63, 0).rgb + vec3(0.447213595, 1.41421356, 1.61803398) * float(frameCounter % 64));
+		vec3 crep = CrepuscularShadowedLight(dir, CloudSurfaceDistance(tc), cloudTD, nz) * cloudToComposite;
+		U = CrepuscularApply(U, crep);
+	#endif
 	if (showCapture != 0) {
 		vec2 uv = tc / vec2(0.5 * viewHeight / viewWidth, 0.5) / 0.4;   // square inset, bottom left
 		if (uv.x < 1.0 && uv.y < 1.0) U = textureLod(cloudSkyCaptureSampler, uv, 0.0).rgb * 0.12;
 		vec2 uv2 = (tc - vec2(0.5 - 0.2 * viewHeight / viewWidth, 0.0)) / vec2(0.5 * viewHeight / viewWidth, 0.5) / 0.4;
-		if (uv2.x > 0.0 && uv2.x < 1.0 && uv2.y < 1.0) U = vec3(textureLod(cloudShadowSampler, uv2, 0.0).r) * 2.0;
+		if (uv2.x > 0.0 && uv2.x < 1.0 && uv2.y < 1.0) U = vec3(exp(-textureLod(cloudShadowSampler, uv2 * vec2(0.5, 1.0), 0.0).z)) * 2.0;
 	}
 	imageStore(outImg, px, vec4(U / 120.0, 1.0));
 }
@@ -316,8 +326,8 @@ def main():
     regime.filter = (moderngl.LINEAR, moderngl.LINEAR)
     skipMap = ctx.texture((256, 336), 4, dtype="f2")
     skipMap.filter = (moderngl.NEAREST, moderngl.NEAREST)
-    shadowMap = ctx.texture((512, 512), 1, dtype="f2")
-    shadowMap.filter = (moderngl.LINEAR, moderngl.LINEAR)
+    shadowMap = ctx.texture((1024, 512), 4, dtype="f2")
+    shadowMap.filter = (moderngl.NEAREST, moderngl.NEAREST)
     capture = ctx.texture((512, 512), 4, dtype="f2")
     capture.filter = (moderngl.LINEAR, moderngl.LINEAR)
     wNear = img3d(2048, 2048, 2)
@@ -468,7 +478,11 @@ def main():
     # cloud shadow map, sky capture (4 frames to fill every texel of the checkerboard)
     common_uniforms(pShadow, 0)
     shadowMap.bind_to_image(0, read=False, write=True)
-    run(pShadow, 32, 32)
+    run(pShadow, 64, 32)
+    if os.environ.get("CLOUD_TIMING"):  # second dispatch: the first one includes the compilation
+        import time as _t
+        ctx.finish(); _t0 = _t.perf_counter(); run(pShadow, 64, 32); ctx.finish()
+        print(f"shadow map time: {(_t.perf_counter() - _t0) * 1000:.0f} ms")
     for f in range(4):
         common_uniforms(pCapture, f)
         capture.bind_to_image(0, read=True, write=True)
@@ -502,9 +516,18 @@ def main():
     if args.frame_time is not None:
         set_u(pDisp, "frameTimeCounter", args.frame_time)
     set_u(pDisp, "showCapture", 1 if args.show_capture else 0)
-    out.bind_to_image(0, read=False, write=True)
-    run(pDisp, (W + 7) // 8, (H + 7) // 8)
-    img = np.frombuffer(out.read(), dtype=np.float32).reshape(H, W, 4)[..., :3].astype(np.float64)
+    # the display adds the crepuscular rays (stochastic): averaged over the frames
+    img = np.zeros((H, W, 3))
+    disp_time = 0.0
+    for f in range(args.frames):
+        set_u(pDisp, "frameCounter", 2 * f)   # even: the cloud history is read from cloudHistA
+        out.bind_to_image(0, read=False, write=True)
+        ctx.finish(); t0 = time.perf_counter()
+        run(pDisp, (W + 7) // 8, (H + 7) // 8)
+        ctx.finish()
+        if f > 0: disp_time += time.perf_counter() - t0
+        img += np.frombuffer(out.read(), dtype=np.float32).reshape(H, W, 4)[..., :3].astype(np.float64)
+    img /= args.frames
 
     if os.environ.get("DUMP_LINEAR"):
         np.save(os.environ["DUMP_LINEAR"], np.concatenate([img, acc[..., 2:3]], -1)[::-1].astype(np.float32))
@@ -531,6 +554,7 @@ def main():
     if overrides.get("CLOUD_DEBUG_VIEW") == "3":
         print(f"ray march cost: mean {acc[..., 1].mean():.4f} p95 {np.percentile(acc[..., 1], 95):.4f} (fraction of CQ_STEPS * 3 iterations)")
     if os.environ.get("CLOUD_TIMING"):
+        print(f"display (composition, crepuscular rays) time per frame: {disp_time / max(args.frames - 1, 1) * 1000:.0f} ms")
         print(f"march time per frame: {march_time / max(args.frames - 1, 1) * 1000:.0f} ms (CPU renderer: only ratios are meaningful)")
     print(f"saved {args.out}  cloud cover (1-T mean): {1 - t.mean():.3f}  exposure key {key:.4g}")
 
