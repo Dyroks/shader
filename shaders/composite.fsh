@@ -22,7 +22,8 @@ flat in vec3 colorSkyUp;
 
 #include "/lib/Settings.inc"
 #include "/lib/Uniforms.inc"
-#define LAND_AP_UNIT 0.1   // reflections: colortex1 * 100
+// reflections: colour unit = colortex1 * 100
+#define LAND_AP_UNIT 0.1
 #include "/lib/Common.inc"
 
 #ifdef VOLUMETRIC_CLOUDS

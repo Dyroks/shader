@@ -93,6 +93,22 @@ def compile_one(path, defines, overrides):
         os.unlink(tmp)
 
 
+def iris_lint():
+    """Checks for things glslang accepts but Iris rejects. Returns the number of problems."""
+    problems = 0
+    inc = re.compile(r'^\s*#include\s+"[^"]*"\s*\S')
+    for root, _, files in os.walk(SHADERS):
+        for name in files:
+            if not name.endswith((".fsh", ".vsh", ".gsh", ".csh", ".glsl", ".inc")):
+                continue
+            path = os.path.join(root, name)
+            for i, line in enumerate(open(path, encoding="utf-8", errors="replace"), 1):
+                if inc.match(line):  # Iris reads the rest of the line as part of the path
+                    print(f"IRIS: {os.path.relpath(path, SHADERS)}:{i}: text after #include: {line.strip()}")
+                    problems += 1
+    return problems
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("-D", action="append", default=[], help="extra define injected after #version (NAME or NAME=VALUE)")
@@ -118,7 +134,10 @@ def main():
             failed += 1
             print(f"FAIL {f}\n{out}\n")
     print(f"{len(files) - failed}/{len(files)} programs compiled" + (" OK" if not failed else f", {failed} FAILED"))
-    sys.exit(1 if failed else 0)
+    lint = iris_lint()
+    if lint:
+        print(f"{lint} Iris specific problem(s)")
+    sys.exit(1 if failed or lint else 0)
 
 
 if __name__ == "__main__":

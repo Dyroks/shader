@@ -7,7 +7,8 @@
 #ifndef SKY_INC
 #define SKY_INC
 
-#include "/lib/atmosphere/SkySEUS.inc"   // also PhaseMie, used by other effects
+// SEUS sky, also provides PhaseMie used by other effects
+#include "/lib/atmosphere/SkySEUS.inc"
 
 #if ATMOSPHERE_MODEL == 1
 	#define ATMOSPHERE_LUTS
