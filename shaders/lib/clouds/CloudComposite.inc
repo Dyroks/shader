@@ -130,13 +130,34 @@ void CloudComposite(inout vec3 color, vec3 worldDir, vec2 tc, vec3 skyAmbient) {
 }
 
 // Screen space reflections that land on the sky read the sky drawn by deferred12, before
-// the clouds are composited (composite4). Put the clouds back, using the previous frame's
-// cloud history at that screen position.
+// the clouds are composited (composite4). Put the clouds back from the previous frame's
+// cloud history, reprojected to where this direction was on screen in that frame (so the
+// reflected clouds follow camera rotations without lag). Off screen: the sky capture.
 // skyColor: sky colour read from the screen (any unit), unitScale: that unit / deferred12 unit
 vec3 CloudOverScreenSky(vec3 skyColor, vec3 worldDir, vec2 tc, vec3 skyAmbient, float unitScale) {
 	ivec2 px = ivec2(tc * vec2(viewWidth, viewHeight));
-	vec4 hist = CloudHistory(px, false);
-	vec3 cloudColor = CloudShade(hist.xyz, CloudDepthAt(px), worldDir, cameraPosition.y, worldSunVector, colorSunlight, skyAmbient);
+	float depth = CloudDepthAt(px);
+
+	vec3 prevRel = worldDir * depth + (cameraPosition - previousCameraPosition);
+	vec4 pc = gbufferPreviousProjection * (gbufferPreviousModelView * vec4(prevRel, 1.0));
+	vec2 prevTc = (pc.xy / pc.w + 1.0) * 0.25;
+	vec2 prevPx = prevTc * vec2(viewWidth, viewHeight);
+	vec2 histSize = vec2(textureSize(cloudHistASampler, 0));
+	vec2 internalSize = ceil(vec2(viewWidth, viewHeight) * 0.5);
+	if (pc.w <= 0.0 || any(lessThan(prevPx, vec2(0.5))) || any(greaterThan(prevPx, internalSize - 0.5))) {
+		#if defined CLOUD_SKY_LOOKUPS && defined CLOUD_SKY_LIGHTING
+			return CloudSkyLookup(worldDir).rgb * unitScale;
+		#else
+			return skyColor;
+		#endif
+	}
+
+	// previous frame history = the one not written this frame yet
+	vec2 uv = prevPx / histSize;
+	vec4 hist = (frameCounter & 1) == 0 ? textureLod(cloudHistBSampler, uv, 0.0) : textureLod(cloudHistASampler, uv, 0.0);
+	if (any(isnan(hist)) || any(isinf(hist))) return skyColor;
+
+	vec3 cloudColor = CloudShade(hist.xyz, depth, worldDir, cameraPosition.y, worldSunVector, colorSunlight, skyAmbient);
 	cloudColor = DoNightEyeAtNight(cloudColor, timeMidnight);
 	return skyColor * CloudSat(hist.z) + cloudColor * unitScale;
 }

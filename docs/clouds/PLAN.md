@@ -41,7 +41,9 @@ Référence : 50-60 FPS à l'arrêt, environ 45 en mouvement, sans nuages.
   - **Reflets des nuages visibles seulement sur les bords de l'écran** : les réflexions en espace écran du pack
     reprennent le ciel de `deferred12`, qui n'a pas encore les nuages (ils sont composés dans `composite4`).
     Seuls les rayons sortant de l'écran utilisaient la capture avec nuages. Correctif : `CloudOverScreenSky` repose
-    les nuages (historique de l'image précédente) sur le ciel lu à l'écran.
+    les nuages sur le ciel lu à l'écran, en lisant l'historique de l'image précédente à la position *reprojetée* de la
+    direction (sinon les nuages reflétés traînaient derrière les rotations de caméra, retour du test 3). Hors écran :
+    capture du ciel.
   - **Nuages qui restent visibles quelques secondes sur une surface passant devant la caméra** : la composition et la
     reconstruction temporelle testent maintenant, pixel par pixel, si la surface est plus proche que l'entrée de la
     couche de nuages. Dans ce cas, aucun nuage n'est possible, quel que soit l'historique.
