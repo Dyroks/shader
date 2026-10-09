@@ -24,6 +24,10 @@ flat in vec3 colorSkyUp;
 #include "/lib/Settings.inc"
 #include "/lib/Uniforms.inc"
 #include "/lib/Common.inc"
+
+#ifdef VOLUMETRIC_CLOUDS
+#include "/lib/clouds/CloudLookups.inc"
+#endif
 #include "/lib/Materials.inc"
 #include "/lib/GBufferData.inc"
 
@@ -116,6 +120,9 @@ const float RAY_TRACING_RADIUS = RAY_TRACING_DIAMETER / 2.0;
        float waterDepth=texture2DLod(shadowcolor1,vec2(n.xy-vec2(0.,.5)),3).x*256.0-(i.y+cameraPosition.y);
        r/=sqrt(waterDepth)+1.;
      }
+   #if defined VOLUMETRIC_CLOUDS && defined CLOUD_SHADOWS
+   r*=CloudShadowLookup(i,worldLightVector);
+   #endif
    return r*(1.-wetness);
  }
  vec3 c(vec2 v)
@@ -312,7 +319,11 @@ const float RAY_TRACING_RADIUS = RAY_TRACING_DIAMETER / 2.0;
            vec3 I=P.direction;
            if(isEyeInWater==1)
              I=refract(I,vec3(0.,-1.,0.),1.3333);
+           #if defined VOLUMETRIC_CLOUDS && defined CLOUD_SKY_LIGHTING
+           vec3 N=CloudSkyLookup(I).rgb;
+           #else
            vec3 N=SkyShading(I,worldSunVector);
+           #endif
            N*=saturate(I.y*10.+1.);
            N=DoNightEyeAtNight(N*12.,timeMidnight)*.083333;
            vec3 L=N,E=L;

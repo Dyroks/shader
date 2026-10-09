@@ -81,14 +81,10 @@ def extract_functions(src, names):
 
 
 def seus_sky_functions():
+    """SEUS sky (lib/atmosphere/SkySEUS.inc) + the few Common.inc helpers the display needs."""
     src = open(os.path.join(SHADERS, "lib", "Common.inc")).read()
-    glob = "\n".join(l for l in src.split("\n") if re.match(
-        r'^(const\s+)?(vec3|float)\s+(Rayleigh|exp2Rayleigh|AtmosphereMie|AtmosphereDensity|AtmosphereDensityFalloff|AtmosphereExtent|MplusR)\b', l))
-    funcs = extract_functions(src, ["saturate", "SmoothMin", "SmoothMax", "Luminance", "DoNightEyeAtNight", "curve",
-                                    "PhaseMie", "AtmosphereAbsorption", "SunAbsorptionAtAltitude", "Atmosphere",
-                                    "SkyShading", "RenderSunDisc"])
-    # order matters: globals first, then functions (Atmosphere uses PhaseMie etc.)
-    return glob + "\n" + funcs
+    funcs = extract_functions(src, ["saturate", "Luminance", "DoNightEyeAtNight", "curve", "RenderSunDisc"])
+    return '#include "/lib/atmosphere/SkySEUS.inc"\n' + funcs
 
 
 DISPLAY_SHADER = r"""
@@ -119,7 +115,9 @@ vec3 SkyAmbient() {
 	return a / 17.0;
 }
 
+#include "/lib/clouds/CloudLookups.inc"
 #include "/lib/clouds/CloudComposite.inc"
+uniform int showCapture;
 
 void main() {
 	ivec2 px = ivec2(gl_GlobalInvocationID.xy);
@@ -135,7 +133,11 @@ void main() {
 	if (tg > 0.0) {
 		vec3 L = worldLightVector;
 		vec3 checker = mix(vec3(0.10, 0.16, 0.06), vec3(0.14, 0.2, 0.09), step(0.5, fract(dot(floor((cameraPosition.xz + dir.xz * tg) / 64.0), vec2(0.5)))));
-		n = checker * (0.83 * 24.0 * colorSunlight * SUNLIGHT_BRIGHTNESS * max(L.y, 0.0) + 4.5 * skyAmb);
+		float shadow = 1.0;
+		#ifdef CLOUD_SHADOWS
+		shadow = CloudShadowLookup(dir * tg, L);
+		#endif
+		n = checker * (0.83 * 24.0 * colorSunlight * SUNLIGHT_BRIGHTNESS * max(L.y, 0.0) * shadow + 4.5 * skyAmb);
 		// crude land haze
 		float LdotV = dot(dir, worldSunVector);
 		float hz = min(tg * 0.0015, AtmosphereExtent);
@@ -146,6 +148,12 @@ void main() {
 	}
 	vec3 U = n * 0.12;
 	CloudComposite(U, dir, tc, skyAmb);
+	if (showCapture != 0) {
+		vec2 uv = tc / vec2(0.5 * viewHeight / viewWidth, 0.5) / 0.4;   // square inset, bottom left
+		if (uv.x < 1.0 && uv.y < 1.0) U = textureLod(cloudSkyCaptureSampler, uv, 0.0).rgb * 0.12;
+		vec2 uv2 = (tc - vec2(0.5 - 0.2 * viewHeight / viewWidth, 0.0)) / vec2(0.5 * viewHeight / viewWidth, 0.5) / 0.4;
+		if (uv2.x > 0.0 && uv2.x < 1.0 && uv2.y < 1.0) U = vec3(textureLod(cloudShadowSampler, uv2, 0.0).r) * 2.0;
+	}
 	imageStore(outImg, px, vec4(U / 120.0, 1.0));
 }
 """
@@ -201,6 +209,7 @@ def main():
     ap.add_argument("--wetness", type=float, default=0.0)
     ap.add_argument("--ground", type=float, default=64)
     ap.add_argument("--exposure", type=float, default=0.0, help="EV offset")
+    ap.add_argument("--show-capture", action="store_true", help="insets: sky capture (left) and cloud shadow map (right)")
     ap.add_argument("-O", action="append", default=[], help="option override NAME=VALUE (see compile_check.py)")
     args = ap.parse_args()
 
@@ -247,6 +256,10 @@ def main():
 
     regime = ctx.texture((512, 512), 4, dtype="f2")
     regime.filter = (moderngl.LINEAR, moderngl.LINEAR)
+    shadowMap = ctx.texture((512, 512), 1, dtype="f2")
+    shadowMap.filter = (moderngl.LINEAR, moderngl.LINEAR)
+    capture = ctx.texture((512, 512), 4, dtype="f2")
+    capture.filter = (moderngl.LINEAR, moderngl.LINEAR)
     wNear = img3d(2048, 2048, 2)
     wFar = img3d(1024, 1024, 2)
     raw = ctx.texture((W, H), 4, dtype="f2")
@@ -292,12 +305,14 @@ def main():
 
     pRegime, pBeginN, pBeginF = program("begin.csh"), program("begin_a.csh"), program("begin_b.csh")
     pMarch, pResolve = program("composite4_a.csh"), program("composite4_b.csh")
+    pShadow, pCapture = program("begin_c.csh"), program("begin_d.csh")
     disp_src = DISPLAY_SHADER.replace("%SEUS%", seus_sky_functions())
     pDisp = ctx.compute_shader(build_source(disp_src, overrides, [], is_text=True))
 
     units = {"cloudNoiseBase": base, "cloudNoiseDetail": detail, "cloudCurl": curl, "noisetex": noisetex,
              "depthtex0": depthtex, "cloudRegimeSampler": regime, "cloudWeatherNearSampler": wNear, "cloudWeatherFarSampler": wFar,
-             "cloudRawSampler": raw, "cloudHistASampler": histA, "cloudHistBSampler": histB}
+             "cloudRawSampler": raw, "cloudHistASampler": histA, "cloudHistBSampler": histB,
+             "cloudShadowSampler": shadowMap, "cloudSkyCaptureSampler": capture}
 
     def common_uniforms(p, frame):
         set_u(p, "cameraPosition", cam)
@@ -318,6 +333,7 @@ def main():
         set_u(p, "colorSunlight", colorSunlight)
         set_u(p, "nightBrightness", nightBrightness)
         set_u(p, "timeMidnight", float(np.clip(-sun[1] * 10, 0, 1)))
+        set_u(p, "nightVision", 0.0)
         set_u(p, "groundY", args.ground)
         for i, (name, tex) in enumerate(units.items()):
             try:
@@ -340,6 +356,14 @@ def main():
         run(p, size // 16, size // 16)
         layer = np.frombuffer(img.read(), dtype=np.float16).reshape(2, size, size, 4)
         print(f"weather {size}: footprint>0 {np.mean(layer[0, ..., 0] > 0):.3f}  thick mean {layer[0, ..., 2].mean():.2f}  dist max {layer[1, ..., 0].max():.2f}")
+    # cloud shadow map, sky capture (4 frames to fill every texel of the checkerboard)
+    common_uniforms(pShadow, 0)
+    shadowMap.bind_to_image(0, read=False, write=True)
+    run(pShadow, 32, 32)
+    for f in range(4):
+        common_uniforms(pCapture, f)
+        capture.bind_to_image(0, read=True, write=True)
+        run(pCapture, 32, 32)
     # rebind samplers after image use
     acc = np.zeros((H, W, 4), dtype=np.float64)
     for f in range(args.frames):
@@ -360,6 +384,7 @@ def main():
     histA.write(np.concatenate([acc[..., :3], np.ones_like(acc[..., :1])], -1).astype(np.float16).tobytes())
     raw.write(acc.astype(np.float16).tobytes())  # depth channel averaged: only used for haze
     common_uniforms(pDisp, 0)
+    set_u(pDisp, "showCapture", 1 if args.show_capture else 0)
     out.bind_to_image(0, read=False, write=True)
     run(pDisp, (W + 7) // 8, (H + 7) // 8)
     img = np.frombuffer(out.read(), dtype=np.float32).reshape(H, W, 4)[..., :3].astype(np.float64)

@@ -19,6 +19,10 @@ flat out vec4 skySHB;
 
 #include "/lib/Settings.inc"
 #include "/lib/Uniforms.inc"
+#if defined VOLUMETRIC_CLOUDS && defined CLOUD_SKY_LIGHTING
+#define CLOUD_SH_FROM_CAPTURE
+#include "/lib/clouds/CloudLookups.inc"
+#endif
 #include "/lib/Common.inc"
 
 

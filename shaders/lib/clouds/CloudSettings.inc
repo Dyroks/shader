@@ -37,5 +37,9 @@
 #define CLOUD_GROUND_BOUNCE 0.2 // Ground albedo used for light bounced from the ground onto cloud bases. 0 disables it. [0.0 0.1 0.2 0.3 0.4 0.5]
 #define CLOUD_AERIAL_PERSPECTIVE // Atmospheric haze between the camera and the clouds.
 
+// ---- Integration -----------------------------------------------------------------------
+#define CLOUD_SHADOWS // Cloud shadows on the terrain, in the GI sunlight and in the godrays.
+#define CLOUD_SKY_LIGHTING // Clouds seen by the GI, the sky light and the reflections (sky capture).
+
 // ---- Debug ----------------------------------------------------------------------------
 #define CLOUD_DEBUG_VIEW 0 // 0 = off, 1 = clouds only, 2 = weather map (top-down), 3 = ray march cost heat map, 4 = transmittance. [0 1 2 3 4]

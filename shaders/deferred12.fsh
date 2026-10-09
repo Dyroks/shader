@@ -30,6 +30,10 @@ flat in vec4 skySHB;
 #include "/lib/Settings.inc"
 #include "/lib/Uniforms.inc"
 #include "/lib/Common.inc"
+
+#ifdef VOLUMETRIC_CLOUDS
+#include "/lib/clouds/CloudLookups.inc"
+#endif
 #include "/lib/Materials.inc"
 #include "/lib/GBufferData.inc"
 
@@ -534,6 +538,9 @@ vec3 SpecularGGX(vec3 N, vec3 V, vec3 L, float roughness, float F0)
            #endif
            #ifdef SCREEN_SPACE_SHADOW
            Y*=ScreenSpaceShadow(s.xyz,f.xyz,v.geoNormal.xyz,x,randomness.x);
+           #endif
+           #if defined VOLUMETRIC_CLOUDS && defined CLOUD_SHADOWS
+           Y*=CloudShadowLookup(a.xyz,worldLightVector);
            #endif
            n+=TintUnderwaterDepth(DoNightEyeAtNight(l*v.albedo.xyz*Y*colorSunlight,timeMidnight));
            vec3 R=SpecularGGX(y,-m,worldLightVector,1.-v.smoothness,v.metalness*.96+.04)*Y;

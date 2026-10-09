@@ -28,6 +28,7 @@ flat in vec3 colorSkyUp;
 
 #ifdef VOLUMETRIC_CLOUDS
 flat in vec3 cloudSkyAmbient;
+#include "/lib/clouds/CloudLookups.inc"
 #include "/lib/clouds/CloudComposite.inc"
 #endif
 
@@ -154,6 +155,9 @@ vec3 WorldPosToShadowProjPos(vec3 worldPos)
                    Z=mix(Z*ad,Z,vec3(X));
                    Z*=Z;
                  }
+               #endif
+               #if defined VOLUMETRIC_CLOUDS && defined CLOUD_SHADOWS
+               Z*=CloudShadowLookup(W.xyz,worldLightVector);
                #endif
                if(eyeInWater)
                  {

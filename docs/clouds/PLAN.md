@@ -10,7 +10,7 @@ Base du pack : SEUS PTGI HRR 2.1 GFME, Iris 1.11.7, Minecraft 26.3, Voxy.
 | 0 | Fondations : outils, textures de bruit, squelette Iris, menu, suppression des anciens nuages | ✅ testée en jeu |
 | 1 | Forme, météo, raymarching, reconstruction temporelle, composition | ✅ testée en jeu (OK avec Voxy, perte de FPS faible) |
 | 2 | Éclairage : phase, diffusion, ambiance, couleur du soleil à l'altitude, crépuscule, nuit + retours du test (formes moins rondes, bruit temporel) | ✅ livrée, à tester |
-| 3 | Intégration : capture du ciel pour la GI et les réflexions, ombres des nuages, rayons de lumière, eau | ⏳ |
+| 3 | Intégration : capture du ciel (GI, lumière ambiante du ciel, réflexions), ombres des nuages (terrain, GI, rayons de lumière) | ✅ livrée, à tester (sauf : nuages vus depuis sous l'eau) |
 | 4 | Atmosphère Hillaire 2020 (tables précalculées), remplacement du ciel SEUS, option SEUS/Hillaire | ⏳ |
 | 5 | Variété : couches moyennes et hautes (Ac, As, Ci, Cs, Cc), cumulonimbus et enclume, régimes météo, éclairs | ⏳ |
 | 6 | Cache voxel + SDF, volume de lumière, intérieur des nuages simplifié, réglage des préréglages | ⏳ |
@@ -27,7 +27,17 @@ Référence : 50-60 FPS à l'arrêt, environ 45 en mouvement, sans nuages.
   - Formes trop arrondies : en phase 2, ajout de tourelles (sommet local variable), d'une déformation du bruit,
     d'un cisaillement du vent et d'une érosion plus forte. Réglables avec *Érosion* et *Irrégularité*.
 
-## Architecture (phases 0-2)
+### Points d'intégration dans le code du pack (phase 3)
+
+| Fichier | Changement |
+|---|---|
+| `deferred.fsh`, `deferred2.fsh` | rayons de GI vers le ciel : capture ; lumière du soleil de la GI : × ombre des nuages |
+| `deferred12.vsh` (via `GetSkylightData` de `Common.inc`) | harmoniques sphériques du ciel (lumière ambiante lointaine) : capture |
+| `deferred12.fsh` | lumière du soleil sur le terrain : × ombre des nuages |
+| `composite.fsh` | réflexions : ciel de la capture, disque solaire masqué par les nuages ; soleil réfléchi : × ombre |
+| `composite4.fsh` | rayons de lumière : × ombre des nuages ; composition des nuages à l'écran |
+
+## Architecture (phases 0-3)
 
 Le pack rend la scène à **demi-résolution** dans le quart bas-gauche de l'écran (HRR), puis son TAA (`composite7`)
 reconstruit la pleine résolution. Les buffers des nuages suivent cette grille « interne » : en 4K, l'interne fait 1920×1080.
@@ -36,6 +46,8 @@ reconstruit la pleine résolution. Les buffers des nuages suivent cette grille �
 begin.csh        carte régime 512²       couverture / convection / altitude de base / regroupement (très basse fréquence)
 begin_a.csh      météo proche 2048²×2    cellules de nuages (3 tailles de grilles : 9 / 3,5 / 1,4 km)
 begin_b.csh      météo lointaine 1024²×2 + couche stratiforme, distance au nuage le plus proche, sommet max local
+begin_c.csh      carte d'ombre 512²     transmittance des nuages le long de la lumière, sur le plan du bas de la couche (64 m/texel)
+begin_d.csh      capture du ciel 512²   ciel + nuages en carte octaédrique, ¼ des texels mis à jour par image, marche basse qualité
    ...           (passes du pack)
 composite4_a.csh raymarching             ½×½ de l'interne, 1 pixel sur 4 par image en damier (CLOUD_RES 2)
 composite4_b.csh reconstruction          historique pleine résolution interne (ping-pong cloudHistA / cloudHistB)
@@ -53,6 +65,9 @@ composite4.fsh   composition             couleurs du soleil et du ciel, perspect
 | `shaders/lib/clouds/CloudView.inc` | grille interne, gigue du TAA, profondeur de la scène (Voxy / DH), reprojection |
 | `shaders/lib/clouds/CloudUniforms.inc` | uniforms des compute shaders (qui n'incluent pas `Common.inc`) |
 | `shaders/lib/clouds/CloudComposite.inc` | composition dans `composite4.fsh`, vues de debug |
+| `shaders/lib/clouds/CloudShading.inc` | couleur des nuages à partir du raymarching (partagé par la composition et la capture du ciel) |
+| `shaders/lib/clouds/CloudSky.inc`, `CloudLookups.inc` | capture du ciel et carte d'ombre : encodage et lectures pour les passes du pack |
+| `shaders/lib/atmosphere/SkySEUS.inc` | fonctions de ciel SEUS, sorties de `Common.inc` pour être utilisables en compute (remplacées en phase 4) |
 | `shaders/textures/clouds/*.dat` | bruits 3D tuilables (Perlin-Worley 128³, Worley 32³, curl 128²), générés par `tools/gen_cloud_noise.py` |
 
 ### Modèle de nuages
@@ -86,9 +101,9 @@ composite4.fsh   composition             couleurs du soleil et du ciel, perspect
 
 ### Écarts connus (à traiter dans les phases suivantes)
 
-- La GI, les harmoniques sphériques du ciel et les réflexions voient un ciel **sans nuages** (phase 3).
-- Pas d'ombres des nuages sur le terrain ni dans les rayons de lumière (phase 3).
-- **Sous l'eau**, les nuages ne sont pas composés (phase 3).
+- **Sous l'eau**, les nuages ne sont pas composés à l'écran (les réflexions et la GI les voient).
+- Les réflexions des nuages viennent de la capture 512² : elles sont un peu floues sur une eau très calme.
+- Les ombres des nuages couvrent environ ±16 km autour de la caméra (à l'échelle 1) et s'estompent quand le soleil est très bas.
 - La perspective atmosphérique SEUS suppose une caméra au sol. Les rayons vers le bas utilisent la direction miroir (phase 4).
 - Une seule couche basse/moyenne : pas encore de cirrus ni d'enclumes (phase 5).
 - L'intérieur des nuages fonctionne, mais avec des pas grossiers près de la caméra (phase 6).

@@ -27,6 +27,10 @@ in mat4 gbufferPreviousProjectionInverse;
 #include "/lib/Settings.inc"
 #include "/lib/Uniforms.inc"
 #include "/lib/Common.inc"
+
+#ifdef VOLUMETRIC_CLOUDS
+#include "/lib/clouds/CloudLookups.inc"
+#endif
 #include "/lib/GBufferData.inc"
 
 
@@ -133,6 +137,9 @@ const float RAY_TRACING_RADIUS = RAY_TRACING_DIAMETER / 2.0;
        float waterDepth=texture2DLod(shadowcolor1,vec2(t.xy-vec2(0.,.5)),3).x*256.0-(i.y+cameraPosition.y);
        r/=sqrt(waterDepth)+1.;
      }
+   #if defined VOLUMETRIC_CLOUDS && defined CLOUD_SHADOWS
+   r*=CloudShadowLookup(i+y*.99,worldLightVector);
+   #endif
    return r*(1.-wetness);
  }
  struct awIafiSlNY{float mwtAZpOIMX;float KZGLOOTLva;float yDFXZDbcEk;float cvVAxIXMRt;vec3 jbwXZaPXmq;};
@@ -269,7 +276,11 @@ const float RAY_TRACING_RADIUS = RAY_TRACING_DIAMETER / 2.0;
                vec3 D=R.direction;
                if(isEyeInWater>0)
                  D=refract(D,vec3(0.,-1.,0.),1.3333);
+               #if defined VOLUMETRIC_CLOUDS && defined CLOUD_SKY_LIGHTING
+               vec3 P=CloudSkyLookup(D).rgb;
+               #else
                vec3 P=SkyShading(D,worldSunVector);
+               #endif
                P*=saturate(D.y*10.+1.);
                P=DoNightEyeAtNight(P*12.,timeMidnight)*.083333;
                vec3 Y=P,b=Y;

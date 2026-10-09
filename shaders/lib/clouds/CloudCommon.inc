@@ -11,7 +11,9 @@
 #define CLOUD_COMMON_INC
 
 // ---- Quality presets ------------------------------------------------------------------
-#if CLOUD_QUALITY == 0
+// (a program can define CQ_OVERRIDE and its own CQ_* values, e.g. the low quality sky capture)
+#ifdef CQ_OVERRIDE
+#elif CLOUD_QUALITY == 0
 	#define CQ_STEPS 40
 	#define CQ_LIGHT_STEPS 3
 	#define CQ_MS_OCTAVES 2
@@ -187,6 +189,14 @@ float CloudHorizonDip(float altitude) {
 // Visibility of the sun disc from a given altitude (0 below the local horizon)
 float CloudSunVisibility(float sunY, float altitude) {
 	return CloudSat((sunY + CloudHorizonDip(altitude)) * 40.0);
+}
+
+// The pack's light colour (colorSunlight in shaders.properties), for programs that cannot use
+// that custom uniform. Ly: elevation of the pack's light (sun by day, moon by night).
+vec3 CloudPackLightColor(float Ly, bool night, float wet, float nightBright) {
+	float v1 = 0.233333 * (1.0 - exp(-Ly * 24.0)) / (Ly + 0.00001);
+	float v2 = min(Ly * 40.0, 1.0) * (night ? nightBright : 1.0);
+	return exp((-vec3(0.175, 0.405, 0.995) - wet) * v1) * v2 * vec3(0.976709, 0.946058, 0.871758);
 }
 
 // Colour of the sunlight reaching a given altitude: the pack's sunlight model (see

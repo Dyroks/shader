@@ -100,6 +100,10 @@ option.CLOUD_GROUND_BOUNCE=Rebond du sol
 option.CLOUD_GROUND_BOUNCE.comment=Albédo du sol pour la lumière renvoyée vers la base des nuages. 0 désactive.
 option.CLOUD_AERIAL_PERSPECTIVE=Perspective atmosphérique
 option.CLOUD_AERIAL_PERSPECTIVE.comment=Voile atmosphérique entre la caméra et les nuages.
+option.CLOUD_SHADOWS=Ombres des nuages
+option.CLOUD_SHADOWS.comment=Ombres des nuages sur le terrain, dans la lumière du soleil de la GI et dans les rayons de lumière.
+option.CLOUD_SKY_LIGHTING=Nuages dans la lumière du ciel
+option.CLOUD_SKY_LIGHTING.comment=La GI, la lumière ambiante du ciel et les réflexions voient les nuages (capture du ciel mise à jour en continu).
 option.CLOUD_DEBUG_VIEW=Vue de debug
 option.CLOUD_DEBUG_VIEW.comment=Aide aux tests : nuages seuls, carte météo vue de dessus (coin bas gauche), coût du raymarching (bleu = faible, rouge = élevé), transmittance.
 value.CLOUD_DEBUG_VIEW.0=Désactivée

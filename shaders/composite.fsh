@@ -23,6 +23,10 @@ flat in vec3 colorSkyUp;
 #include "/lib/Settings.inc"
 #include "/lib/Uniforms.inc"
 #include "/lib/Common.inc"
+
+#ifdef VOLUMETRIC_CLOUDS
+#include "/lib/clouds/CloudLookups.inc"
+#endif
 #include "/lib/Materials.inc"
 #include "/lib/GBufferData.inc"
 
@@ -119,6 +123,9 @@ vec2 Texcoord;
        float w=max(0.,d.x*512.-128.-(v.y+cameraPosition.y)),h=GetCausticsComposite(v,i,w);
        c=mix(c*h,c,t);
      }
+   #if defined VOLUMETRIC_CLOUDS && defined CLOUD_SHADOWS
+   c*=CloudShadowLookup(v,worldLightVector);
+   #endif
    c=TintUnderwaterDepth(c);
    return c*(1.-wetness);
  }
@@ -351,10 +358,16 @@ vec2 Texcoord;
          }
        if(abs(Y.w-0.5)>0.499)
          {
+           #if defined VOLUMETRIC_CLOUDS && defined CLOUD_SKY_LIGHTING
+           vec4 cloudSky=CloudSkyLookup(F.direction);
+           vec3 j=cloudSky.rgb;
+           #else
+           vec4 cloudSky=vec4(1.);
            vec3 j=SkyShading(F.direction,worldSunVector);
+           #endif
            j=DoNightEyeAtNight(j*12.,timeMidnight)*.083333;
            vec3 L=j,A=L;
-           A+=RenderSunDiscRefelction(F.direction,worldSunVector,colorSunlight)*AtmosphereAbsorption(F.direction,AtmosphereExtent)*2000.;
+           A+=RenderSunDiscRefelction(F.direction,worldSunVector,colorSunlight)*AtmosphereAbsorption(F.direction,AtmosphereExtent)*2000.*cloudSky.a;
            L=TintUnderwaterDepth(A);
            N+=L*.1*l*stainedColor;
            J=114514.;

@@ -8,9 +8,13 @@
 #ifndef CLOUD_COMPOSITE_INC
 #define CLOUD_COMPOSITE_INC
 
+#ifndef CLOUD_WORLDDAY_DECLARED
+#define CLOUD_WORLDDAY_DECLARED
 uniform int worldDay;
+#endif
 
 #include "/lib/clouds/CloudCommon.inc"
+#include "/lib/clouds/CloudShading.inc"
 
 uniform sampler2D cloudRawSampler;
 uniform sampler2D cloudHistASampler;
@@ -21,21 +25,6 @@ uniform sampler3D cloudWeatherNearSampler;
 
 // Scene radiance units: composite4 works with (deferred12 radiance) * 0.001 * 120
 const float cloudToComposite = 0.12;
-
-// Irradiance of the light used by the ray march (sun, or moon at night), matching the pack's
-// terrain lighting: 24 * colorSunlight radiance on a white surface facing the sun ->
-// irradiance 24 * pi * colorSunlight. The sun colour is evaluated at the cloud altitude
-// (less atmosphere above it, still lit after sunset); its visibility is in the ray march.
-vec3 CloudLightIrradiance(vec3 worldDir, float depth) {
-	vec3 c;
-	if (worldSunVector.y > cloudSunModeLimit) {
-		float alt = cameraPosition.y + worldDir.y * depth + depth * depth / (2.0 * cloudPlanetR);
-		c = CloudSunColorAtAltitude(worldSunVector.y, alt, wetness);
-	} else {
-		c = colorSunlight;   // moon light at night
-	}
-	return c * (24.0 * cloudPI * SUNLIGHT_BRIGHTNESS * CLOUD_SUNLIGHT);
-}
 
 vec3 CloudHeatColor(float x) {
 	x = CloudSat(x);
@@ -69,24 +58,7 @@ void CloudComposite(inout vec3 color, vec3 worldDir, vec2 tc, vec3 skyAmbient) {
 	}
 
 	float T = CloudSat(hist.z);
-	vec3 light = CloudLightIrradiance(worldDir, depthKm * 1000.0) * max(hist.x, 0.0) + skyAmbient * (max(hist.y, 0.0) * CLOUD_AMBIENT);
-
-	#ifdef CLOUD_AERIAL_PERSPECTIVE
-		// The SEUS atmosphere assumes a camera on the ground and gets very dense for downward
-		// rays: use the mirrored upward direction until the atmosphere is replaced (phase 4).
-		vec3 apDir = worldDir;
-		apDir.y = max(abs(apDir.y), 0.01);
-		float apDepth = min(depthKm * 1000.0 / cloudScale * 0.0012, AtmosphereExtent * 0.95);
-		float LdotV = dot(apDir, worldSunVector);
-		float LdotV2 = LdotV * LdotV + 1.0;
-		vec3 absorb = AtmosphereAbsorption(apDir, apDepth);
-		vec3 haze = Atmosphere(apDir, worldSunVector, 0.25, apDepth, LdotV, LdotV2);
-		haze += Atmosphere(apDir, -worldSunVector, 0.25, apDepth, -LdotV, LdotV2) * nightBrightness;
-		vec3 cloudColor = light * absorb + haze * (1.0 - T);
-	#else
-		vec3 cloudColor = light;
-	#endif
-
+	vec3 cloudColor = CloudShade(hist.xyz, depthKm * 1000.0, worldDir, cameraPosition.y, worldSunVector, colorSunlight, skyAmbient);
 	cloudColor = DoNightEyeAtNight(cloudColor, timeMidnight);
 
 	#if CLOUD_DEBUG_VIEW == 0

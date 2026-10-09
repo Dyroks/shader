@@ -100,6 +100,10 @@ option.CLOUD_GROUND_BOUNCE=Ground Bounce
 option.CLOUD_GROUND_BOUNCE.comment=Ground albedo for the light bounced onto cloud bases. 0 disables it.
 option.CLOUD_AERIAL_PERSPECTIVE=Aerial Perspective
 option.CLOUD_AERIAL_PERSPECTIVE.comment=Atmospheric haze between the camera and the clouds.
+option.CLOUD_SHADOWS=Cloud Shadows
+option.CLOUD_SHADOWS.comment=Cloud shadows on the terrain, in the GI sunlight and in the godrays.
+option.CLOUD_SKY_LIGHTING=Clouds in Sky Light
+option.CLOUD_SKY_LIGHTING.comment=The GI, the ambient sky light and the reflections see the clouds (continuously updated sky capture).
 option.CLOUD_DEBUG_VIEW=Debug View
 option.CLOUD_DEBUG_VIEW.comment=Testing aid: clouds only, top-down weather map (bottom left corner), ray march cost (blue = cheap, red = expensive), transmittance.
 value.CLOUD_DEBUG_VIEW.0=Off
