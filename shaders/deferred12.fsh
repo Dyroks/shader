@@ -483,7 +483,7 @@ vec3 SpecularGGX(vec3 N, vec3 V, vec3 L, float roughness, float F0)
          p.xyz=refract(p.xyz,vec3(0.,-1.,0.),1.3);
        vec3 q=SkyShading(p.xyz,worldSunVector.xyz);
        n=q;
-       vec3 J=AtmosphereAbsorption(p.xyz,AtmosphereExtent);
+       vec3 J=SkyTransmittance(p.xyz);
        n+=v.albedo.xyz*J*.2;
        n+=RenderSunDisc(p,worldSunVector,colorSunlight)*J*2000.;
      }

@@ -2,8 +2,8 @@
 //  Volumetric clouds - colour of the clouds from the ray march output
 //
 //  Shared by the composition (composite4.fsh) and the sky capture (begin_d.csh).
-//  Needs CloudCommon.inc, lib/atmosphere/SkySEUS.inc, and the uniforms wetness,
-//  nightBrightness (SkySEUS).
+//  Needs CloudCommon.inc, lib/atmosphere/Sky.inc, and the uniforms wetness,
+//  nightBrightness.
 // =====================================================================================
 
 #ifndef CLOUD_SHADING_INC
@@ -22,8 +22,12 @@ vec3 CloudShade(vec3 data, float depth, vec3 dir, float camY, vec3 sunVec, vec3 
 	// Light used by the ray march: sun (colour at the cloud altitude) or moon
 	vec3 lightColor;
 	if (sunVec.y > cloudSunModeLimit) {
-		float alt = camY + dir.y * depth + depth * depth / (2.0 * cloudPlanetR);
-		lightColor = CloudSunColorAtAltitude(sunVec.y, alt, wetness);
+		#if ATMOSPHERE_MODEL == 1
+			lightColor = AtmoSunColorAt(dir, depth, sunVec);
+		#else
+			float alt = camY + dir.y * depth + depth * depth / (2.0 * cloudPlanetR);
+			lightColor = CloudSunColorAtAltitude(sunVec.y, alt, wetness);
+		#endif
 	} else {
 		lightColor = moonColor;
 	}
@@ -31,7 +35,11 @@ vec3 CloudShade(vec3 data, float depth, vec3 dir, float camY, vec3 sunVec, vec3 
 	vec3 light = lightColor * (24.0 * cloudPI * SUNLIGHT_BRIGHTNESS * CLOUD_SUNLIGHT) * max(data.x, 0.0)
 	           + skyAmbient * (max(data.y, 0.0) * CLOUD_AMBIENT);
 
-	#ifdef CLOUD_AERIAL_PERSPECTIVE
+	#if defined CLOUD_AERIAL_PERSPECTIVE && ATMOSPHERE_MODEL == 1
+		vec3 apT;
+		vec3 haze = AtmoAerialPerspective(dir, depth, sunVec, nightBrightness, 12, apT);
+		return light * apT + haze * (1.0 - T);
+	#elif defined CLOUD_AERIAL_PERSPECTIVE
 		// The SEUS atmosphere assumes a camera on the ground and gets very dense for downward
 		// rays: use the mirrored upward direction until the atmosphere is replaced (phase 4).
 		vec3 apDir = dir;

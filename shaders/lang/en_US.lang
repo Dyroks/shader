@@ -29,6 +29,25 @@ screen.Others.comment=Some extra settings
 
 # Atmosphere
 # Volumetric clouds
+screen.Sky=Sky & Atmosphere...
+screen.Sky.comment=Atmosphere model (SEUS or physical), haze, distant terrain haze
+option.ATMOSPHERE_MODEL=Atmosphere
+option.ATMOSPHERE_MODEL.comment=SEUS: the original sky. Physical: Hillaire 2020 precomputed scattering (Rayleigh, aerosols, ozone, multiple scattering), consistent with the sunlight, correct seen from any altitude, with a physical haze over distant terrain and clouds.
+value.ATMOSPHERE_MODEL.0=SEUS
+value.ATMOSPHERE_MODEL.1=Physical
+option.ATMOSPHERE_HAZE=Haze
+option.ATMOSPHERE_HAZE.comment=Physical atmosphere: amount of aerosols in the lowest kilometres (visibility). Rain adds more.
+value.ATMOSPHERE_HAZE.0=Very Clean Air
+value.ATMOSPHERE_HAZE.1=Clean Air
+value.ATMOSPHERE_HAZE.2=Clear
+value.ATMOSPHERE_HAZE.3=Normal
+value.ATMOSPHERE_HAZE.4=Slightly Hazy
+value.ATMOSPHERE_HAZE.5=Hazy
+value.ATMOSPHERE_HAZE.6=Very Hazy
+option.ATMOSPHERE_AERIAL_PERSPECTIVE=Distant Terrain Haze
+option.ATMOSPHERE_AERIAL_PERSPECTIVE.comment=Physical atmosphere: multiplies the distance used for the haze over the terrain. 1.0 = physical (follows the Cloud Scale). Higher for a more pronounced depth effect.
+option.ATMOSPHERE_SKY_BRIGHTNESS=Sky Brightness
+option.ATMOSPHERE_SKY_BRIGHTNESS.comment=Physical atmosphere: brightness of the sky and of the haze. 1.0 = physically consistent with the sunlight (brighter than the SEUS sky).
 screen.Clouds=Clouds...
 screen.Clouds.comment=Volumetric clouds: quality, shape, weather and lighting
 screen.CloudQuality=Cloud Quality...
@@ -65,7 +84,7 @@ option.CLOUD_DETAIL_DISTANCE.comment=Distance (km) up to which small details are
 option.CLOUD_STEP_SCALE=[Custom] Step Length
 option.CLOUD_STEP_SCALE.comment=Step length multiplier: lower = finer and slower. Only used with the Custom quality.
 option.CLOUD_SCALE=Cloud Scale
-option.CLOUD_SCALE.comment=Size of everything cloud related. 1.0 = real world scale (a cumulus is about 1 km wide). Lower it for vanilla sized worlds. Rendering stays identical at every scale.
+option.CLOUD_SCALE.comment=Size of everything related to the clouds and the physical atmosphere. 1.0 = real world scale (a cumulus is about 1 km wide). Lower it for vanilla sized worlds. Rendering stays identical at every scale.
 option.CLOUD_ALTITUDE=Altitude
 option.CLOUD_ALTITUDE.comment=Altitude (absolute Y) of the base of low clouds.
 option.CLOUD_COVERAGE=Coverage

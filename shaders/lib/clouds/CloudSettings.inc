@@ -17,7 +17,7 @@
 #define CLOUD_TEMPORAL // Temporal accumulation (reduces noise, may ghost slightly in fast motion).
 
 // ---- World / look ---------------------------------------------------------------------
-#define CLOUD_SCALE 1.0 // Size of everything cloud related. 1.0 = real world scale (cumulus about 1 km wide). Lower for vanilla-sized worlds. Rendering stays identical at every scale. [0.1 0.15 0.2 0.25 0.3 0.35 0.4 0.45 0.5 0.6 0.7 0.8 0.9 1.0 1.25 1.5 2.0]
+#define CLOUD_SCALE 1.0 // Size of everything related to the clouds and the physical atmosphere. 1.0 = real world scale (cumulus about 1 km wide). Lower for vanilla-sized worlds. Rendering stays identical at every scale. [0.1 0.15 0.2 0.25 0.3 0.35 0.4 0.45 0.5 0.6 0.7 0.8 0.9 1.0 1.25 1.5 2.0]
 #define CLOUD_ALTITUDE 1500 // Altitude (absolute Y) of the base of low clouds. [150 200 250 300 350 400 450 500 600 700 800 900 1000 1100 1200 1300 1400 1500 1600 1800 2000 2250 2500 2750 3000 3500 4000]
 #define CLOUD_COVERAGE 0.5 // Average fraction of the sky covered by clouds. [0.0 0.05 0.1 0.15 0.2 0.25 0.3 0.35 0.4 0.45 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1.0]
 #define CLOUD_CONVECTION 0.55 // 0 = flat layered clouds, 1 = tall towering cumulus. [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0]

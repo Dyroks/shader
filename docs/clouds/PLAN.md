@@ -11,8 +11,8 @@ Base du pack : SEUS PTGI HRR 2.1 GFME, Iris 1.11.7, Minecraft 26.3, Voxy.
 | 1 | Forme, météo, raymarching, reconstruction temporelle, composition | ✅ testée en jeu (OK avec Voxy, perte de FPS faible) |
 | 2 | Éclairage : phase, diffusion, ambiance, couleur du soleil à l'altitude, crépuscule, nuit + retours du test (formes moins rondes, bruit temporel) | ✅ testée en jeu |
 | 3 | Intégration : capture du ciel (GI, lumière ambiante du ciel, réflexions), ombres des nuages (terrain, GI, rayons de lumière) | ✅ testée en jeu (sauf : nuages vus depuis sous l'eau) |
-| 4 | Atmosphère Hillaire 2020 (tables précalculées), remplacement du ciel SEUS, option SEUS/Hillaire | ⏳ prochaine |
-| 5 | Variété : couches moyennes et hautes (Ac, As, Ci, Cs, Cc), cumulonimbus et enclume, régimes météo, éclairs | ✅ livrée, à tester |
+| 4 | Atmosphère Hillaire 2020 (tables précalculées), remplacement du ciel SEUS, option SEUS/Hillaire | ✅ livrée, à tester |
+| 5 | Variété : couches moyennes et hautes (Ac, As, Ci, Cs, Cc), cumulonimbus et enclume, régimes météo, éclairs | ✅ testée en jeu (« très bon », pas de problème) |
 | 6 | Cache voxel + SDF, volume de lumière, intérieur des nuages simplifié, réglage des préréglages | ⏳ |
 | 7 | Optionnel : table de diffusion multiple précalculée par path tracing, bibliothèque de nuages simulés | ⏳ |
 
@@ -51,6 +51,24 @@ Référence : 50-60 FPS à l'arrêt, environ 45 en mouvement, sans nuages.
 - **Test 3** : le fantôme sur les surfaces proches est corrigé. Les reflets au centre de l'écran fonctionnent à
   l'arrêt mais traînaient pendant les rotations : corrigé par la reprojection (à confirmer).
 
+## Phase 4 : atmosphère physique
+
+Option *Atmosphère* (menu *Ciel et atmosphère*) : `ATMOSPHERE_MODEL` 0 = ciel SEUS d'origine, 1 = physique (par défaut).
+
+| Élément | Implémentation |
+|---|---|
+| **Modèle** | Hillaire 2020 : Rayleigh (hauteur d'échelle 8 km), aérosols de Mie (1,2 km, g = 0,8, Cornette-Shanks), couche d'ozone (profil en tente centré à 25 km ; absorption du rouge prise vers 610 nm, sinon le crépuscule vire au violet). Sol à Y = 63, albédo 0,25. Toute l'atmosphère suit `CLOUD_SCALE` (1 bloc = 1 m × échelle) : même rendu à toute échelle, horizon cohérent avec celui des nuages. |
+| **Tables** (compute, chaque image) | `begin_d` transmittance 256×64 (paramétrisation de Bruneton), `begin_e` diffusion multiple 32×32 (64 directions, série géométrique), `begin_f` vue du ciel 192×108 à l'altitude de la caméra, éclairée par le soleil puis par la lune (192×216). La capture du ciel avec nuages devient `begin_g` (elle lit ces tables). |
+| **Ciel** | `SkyShading` (`lib/atmosphere/Sky.inc`) aiguille entre SEUS et la table de vue du ciel. Lune : même table éclairée depuis la direction opposée × `nightBrightness`, comme le ciel nocturne SEUS. |
+| **Unités** | Luminance calculée pour un éclairement solaire de 1, convertie par 24π × `SUNLIGHT_BRIGHTNESS` : un mur blanc face au soleil vaut 24 × la couleur du soleil dans le pack, donc le rapport ciel / soleil est physique. Le ciel est plus lumineux que celui de SEUS par rapport au soleil (*Luminosité du ciel* pour ajuster). |
+| **Couleur du soleil** | `colorSunlight` (shaders.properties) : transmittance analytique (masse d'air de Chapman approchée, Schüler 2012) avec les mêmes coefficients, pour rester un uniform utilisable dans tous les programmes et toutes les dimensions. Les nuages utilisent la table de transmittance exacte au point du nuage (avec l'ombre de la planète). |
+| **Perspective atmosphérique** | Marche courte (3 à 10 pas, distribution quadratique) dans les tables de transmittance et de diffusion multiple : terrain (`LandAtmosphericScattering`, y compris réflexions) et nuages (`CloudShade`, 12 pas). Correcte dans toutes les directions, y compris vers le bas depuis la montagne ou en vol (fin de l'astuce de la direction miroir). *Brume sur le relief lointain* multiplie la distance. |
+| **Pluie** | Aérosols × 7 (air gris et brumeux). |
+
+Rendus hors-jeu (comparaison à exposition fixe) : midi plus clair et moins saturé, avec une brume réaliste à l'horizon ;
+coucher du soleil plus neutre ; crépuscule avec lueur orange côté soleil, ciel bleu-violet et ceinture de Vénus à l'opposé ;
+vu de 12 à 30 km, ciel sombre et liseré lumineux à l'horizon.
+
 ## Phase 5 : variété des nuages
 
 Ordre choisi par l'utilisateur : phase 5 avant la phase 4.
@@ -82,7 +100,8 @@ begin.csh        carte régime 512²       couverture / convection / altitude de
 begin_a.csh      météo proche 2048²×2    cellules de nuages (3 tailles de grilles : 9 / 3,5 / 1,4 km)
 begin_b.csh      météo lointaine 1024²×2 + couche stratiforme, distance au nuage le plus proche, sommet max local
 begin_c.csh      carte d'ombre 512²     transmittance des nuages le long de la lumière, sur le plan du bas de la couche (64 m/texel)
-begin_d.csh      capture du ciel 512²   ciel + nuages en carte octaédrique, ¼ des texels mis à jour par image, marche basse qualité
+begin_d..f.csh   atmosphère             tables de transmittance, diffusion multiple, vue du ciel (phase 4)
+begin_g.csh      capture du ciel 512²   ciel + nuages en carte octaédrique, ¼ des texels mis à jour par image, marche basse qualité
    ...           (passes du pack)
 composite4_a.csh raymarching             ½×½ de l'interne, 1 pixel sur 4 par image en damier (CLOUD_RES 2)
 composite4_b.csh reconstruction          historique pleine résolution interne (ping-pong cloudHistA / cloudHistB)
@@ -102,7 +121,10 @@ composite4.fsh   composition             couleurs du soleil et du ciel, perspect
 | `shaders/lib/clouds/CloudComposite.inc` | composition dans `composite4.fsh`, vues de debug |
 | `shaders/lib/clouds/CloudShading.inc` | couleur des nuages à partir du raymarching (partagé par la composition et la capture du ciel) |
 | `shaders/lib/clouds/CloudSky.inc`, `CloudLookups.inc` | capture du ciel et carte d'ombre : encodage et lectures pour les passes du pack |
-| `shaders/lib/atmosphere/SkySEUS.inc` | fonctions de ciel SEUS, sorties de `Common.inc` pour être utilisables en compute (remplacées en phase 4) |
+| `shaders/lib/atmosphere/SkySEUS.inc` | fonctions de ciel SEUS, sorties de `Common.inc` pour être utilisables en compute (option *Atmosphère* = SEUS) |
+| `shaders/lib/atmosphere/Atmosphere.inc` | atmosphère physique : paramètres, paramétrisations des tables, intégration, ciel, perspective atmosphérique |
+| `shaders/lib/atmosphere/Sky.inc` | points d'entrée du pack (`SkyShading`, `SkyTransmittance`), aiguillage SEUS / physique |
+| `shaders/lib/atmosphere/AtmosphereSettings.inc` | options de l'atmosphère |
 | `shaders/textures/clouds/*.dat` | bruits 3D tuilables (Perlin-Worley 128³, Worley 32³, curl 128²) et texture de cirrus 512², générés par `tools/gen_cloud_noise.py` |
 
 ### Modèle de nuages
@@ -139,7 +161,11 @@ composite4.fsh   composition             couleurs du soleil et du ciel, perspect
 - **Sous l'eau**, les nuages ne sont pas composés à l'écran (les réflexions et la GI les voient).
 - Les réflexions des nuages viennent de la capture 512² : elles sont un peu floues sur une eau très calme.
 - Les ombres des nuages couvrent environ ±16 km autour de la caméra (à l'échelle 1) et s'estompent quand le soleil est très bas.
-- La perspective atmosphérique SEUS suppose une caméra au sol. Les rayons vers le bas utilisent la direction miroir (phase 4).
+- Atmosphère SEUS (option 0) : la perspective atmosphérique suppose une caméra au sol ; les rayons vers le bas utilisent
+  la direction miroir. Corrigé par l'atmosphère physique.
+- Atmosphère physique : `colorSunlight` est une approximation analytique (quelques % d'écart avec les tables) qui ignore
+  l'échelle pour l'altitude de la caméra. Les tables suivent l'altitude de la caméra, pas les réflexions vues depuis
+  un autre point.
 - `lightningBoltPosition` est supposée relative à la caméra (à vérifier en jeu : l'éclairage d'un éclair vanilla
   doit se trouver au-dessus de l'impact).
 - Les cumulonimbus apparaissent avec l'orage en quelques secondes (montée de `thunderStrength`), pas en 30 minutes.
@@ -163,6 +189,9 @@ composite4.fsh   composition             couleurs du soleil et du ciel, perspect
      `/time add 24000` plusieurs fois ; `/weather thunder` (cumulonimbus, enclumes, éclairs) ; voler au-dessus des
      altocumulus (environ 4 km d'altitude à l'échelle 1, `CLOUD_ALTITUDE` + 2,7 km × échelle).
    - FPS : comparer *Nuages moyens* 100 % et 0 %, en régime *Cumulus et altocumulus*.
+   - S8 (phase 4) : comparer *Atmosphère* SEUS / Physique à midi, au coucher du soleil, au crépuscule (`/time set 12800`),
+     la nuit, sous la pluie, depuis un sommet (brume sur le relief lointain de Voxy, qui doit se fondre dans le ciel à
+     l'horizon) et en vol très haut. FPS SEUS contre Physique.
 4. Vues de debug utiles pour les retours : *Nuages seuls*, *Coût* (rouge = coûteux), *Carte météo*.
 
 Points d'attention particuliers pour la première version :
@@ -182,6 +211,8 @@ python3 tools/cloud_preview.py out.png --scene noon -O CLOUD_REGIME=4      # un 
 python3 tools/cloud_preview.py out.png --thunder 1 --wetness 0.5 --day 3   # orage, jour du monde
 python3 tools/cloud_preview.py out.png --sun -30 --thunder 1 --bolt 1500 -56 -6000   # éclair vanilla
 CLOUD_TIMING=1 python3 tools/cloud_preview.py out.png   # temps du raymarching (rapports seulement)
+python3 tools/cloud_preview.py out.png --scene sunset --key 0.0011 -O ATMOSPHERE_MODEL=0   # exposition fixe, ciel SEUS
+ATMO_DEBUG=dir python3 tools/cloud_preview.py out.png   # enregistre les tables de l'atmosphère (.npy)
 CLOUD_DUMP_WEATHER=dir python3 tools/cloud_preview.py out.png   # enregistre les cartes météo (.npy)
 ```
 

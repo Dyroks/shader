@@ -84,7 +84,7 @@ def seus_sky_functions():
     """SEUS sky (lib/atmosphere/SkySEUS.inc) + the few Common.inc helpers the display needs."""
     src = open(os.path.join(SHADERS, "lib", "Common.inc")).read()
     funcs = extract_functions(src, ["saturate", "Luminance", "DoNightEyeAtNight", "curve", "RenderSunDisc"])
-    return '#include "/lib/atmosphere/SkySEUS.inc"\n' + funcs
+    return '#include "/lib/atmosphere/Sky.inc"\n' + funcs
 
 
 DISPLAY_SHADER = r"""
@@ -145,13 +145,19 @@ void main() {
 		shadow = CloudShadowLookup(dir * tg, L);
 		#endif
 		n = checker * (0.83 * 24.0 * colorSunlight * SUNLIGHT_BRIGHTNESS * max(L.y, 0.0) * shadow + 4.5 * skyAmb);
-		// crude land haze
-		float LdotV = dot(dir, worldSunVector);
-		float hz = min(tg * 0.0015, AtmosphereExtent);
-		n = n * AtmosphereAbsorption(vec3(dir.x, max(abs(dir.y), 0.01), dir.z), hz) + Atmosphere(vec3(dir.x, 0.01, dir.z), worldSunVector, 0.25, hz, LdotV, LdotV * LdotV + 1.0) * 0.5;
+		#if ATMOSPHERE_MODEL == 1
+			vec3 apT;
+			vec3 apL = AtmoAerialPerspective(dir, tg, worldSunVector, nightBrightness, 10, apT);
+			n = n * apT + apL;
+		#else
+			// crude land haze
+			float LdotV = dot(dir, worldSunVector);
+			float hz = min(tg * 0.0015, AtmosphereExtent);
+			n = n * AtmosphereAbsorption(vec3(dir.x, max(abs(dir.y), 0.01), dir.z), hz) + Atmosphere(vec3(dir.x, 0.01, dir.z), worldSunVector, 0.25, hz, LdotV, LdotV * LdotV + 1.0) * 0.5;
+		#endif
 	} else {
 		n = SkyShading(dir, worldSunVector);
-		n += RenderSunDisc(dir, worldSunVector, colorSunlight) * AtmosphereAbsorption(dir, AtmosphereExtent) * 2000.0;
+		n += RenderSunDisc(dir, worldSunVector, colorSunlight) * SkyTransmittance(dir) * 2000.0;
 	}
 	vec3 U = n * 0.12;
 	CloudComposite(U, dir, tc, skyAmb);
@@ -219,6 +225,7 @@ def main():
     ap.add_argument("--frame-time", type=float, default=None, help="frameTimeCounter of the displayed frame (lightning timing)")
     ap.add_argument("--day", type=int, default=0, help="worldDay (picks the sky regime when CLOUD_REGIME = 0)")
     ap.add_argument("--ground", type=float, default=64)
+    ap.add_argument("--key", type=float, default=None, help="fixed exposure key (default: automatic per image)")
     ap.add_argument("--exposure", type=float, default=0.0, help="EV offset")
     ap.add_argument("--show-capture", action="store_true", help="insets: sky capture (left) and cloud shadow map (right)")
     ap.add_argument("-O", action="append", default=[], help="option override NAME=VALUE (see compile_check.py)")
@@ -268,6 +275,11 @@ def main():
         t.filter = (moderngl.LINEAR, moderngl.LINEAR)
         return t
 
+    atmoT = ctx.texture((256, 64), 4, dtype="f2"); atmoT.filter = (moderngl.LINEAR, moderngl.LINEAR)
+    atmoMS = ctx.texture((32, 32), 4, dtype="f2"); atmoMS.filter = (moderngl.LINEAR, moderngl.LINEAR)
+    atmoSV = ctx.texture((192, 216), 4, dtype="f2"); atmoSV.filter = (moderngl.LINEAR, moderngl.LINEAR)
+    for t in (atmoT, atmoMS, atmoSV):
+        t.repeat_x = t.repeat_y = False
     regime = ctx.texture((512, 512), 4, dtype="f2")
     regime.filter = (moderngl.LINEAR, moderngl.LINEAR)
     shadowMap = ctx.texture((512, 512), 1, dtype="f2")
@@ -319,14 +331,16 @@ def main():
 
     pRegime, pBeginN, pBeginF = program("begin.csh"), program("begin_a.csh"), program("begin_b.csh")
     pMarch, pResolve = program("composite4_a.csh"), program("composite4_b.csh")
-    pShadow, pCapture = program("begin_c.csh"), program("begin_d.csh")
+    pShadow, pCapture = program("begin_c.csh"), program("begin_g.csh")
+    pAtmoT, pAtmoMS, pAtmoSV = program("begin_d.csh"), program("begin_e.csh"), program("begin_f.csh")
     disp_src = DISPLAY_SHADER.replace("%SEUS%", seus_sky_functions())
     pDisp = ctx.compute_shader(build_source(disp_src, overrides, [], is_text=True))
 
     units = {"cloudNoiseBase": base, "cloudNoiseDetail": detail, "cloudCurl": curl, "cloudCirrus": cirrus, "noisetex": noisetex,
              "depthtex0": depthtex, "cloudRegimeSampler": regime, "cloudWeatherNearSampler": wNear, "cloudWeatherFarSampler": wFar,
              "cloudRawSampler": raw, "cloudHistASampler": histA, "cloudHistBSampler": histB,
-             "cloudShadowSampler": shadowMap, "cloudSkyCaptureSampler": capture}
+             "cloudShadowSampler": shadowMap, "cloudSkyCaptureSampler": capture,
+             "atmoTransmittanceSampler": atmoT, "atmoMultiScatSampler": atmoMS, "atmoSkyViewSampler": atmoSV}
 
     def common_uniforms(p, frame):
         set_u(p, "cameraPosition", cam)
@@ -360,6 +374,17 @@ def main():
     def run(p, gx, gy, gz=1):
         p.run(gx, gy, gz)
         ctx.memory_barrier()
+
+    # atmosphere LUTs
+    for p, img, groups in ((pAtmoT, atmoT, (16, 4)), (pAtmoMS, atmoMS, (2, 2)), (pAtmoSV, atmoSV, (12, 14))):
+        common_uniforms(p, 0)
+        img.bind_to_image(0, read=False, write=True)
+        run(p, *groups)
+    if os.environ.get("ATMO_DEBUG"):
+        for name, img, shape in (("transmittance", atmoT, (64, 256)), ("multiscat", atmoMS, (32, 32)), ("skyview", atmoSV, (216, 192))):
+            a = np.frombuffer(img.read(), dtype=np.float16).reshape(*shape, 4)[..., :3].astype(np.float32)
+            np.save(os.path.join(os.environ["ATMO_DEBUG"], name + ".npy"), a)
+            print(f"{name}: min {a.min():.4g} max {a.max():.4g} mean {a.mean(axis=(0, 1))}")
 
     # weather
     common_uniforms(pRegime, 0)
@@ -414,7 +439,7 @@ def main():
 
     # simple auto exposure + filmic tone map
     lum = np.dot(img, [0.2126, 0.7152, 0.0722])
-    key = np.exp(np.mean(np.log(np.maximum(lum, 1e-6))))
+    key = np.exp(np.mean(np.log(np.maximum(lum, 1e-6)))) if args.key is None else args.key
     x = img * (0.18 / max(key, 1e-6)) * 2 ** args.exposure
     a, b, c, d, e = 2.51, 0.03, 2.43, 0.59, 0.14
     y = np.clip((x * (a * x + b)) / (x * (c * x + d) + e), 0, 1) ** (1 / 2.2)

@@ -615,7 +615,7 @@ float GetCausticsDeferred(vec3 worldPos, vec3 worldLightVector, float waterDepth
 	return caustics * 10.0 / (depthBlend + 1.);
 }
 
-#include "/lib/atmosphere/SkySEUS.inc"
+#include "/lib/atmosphere/Sky.inc"
 
 vec3 RenderSunDisc(vec3 worldDir, vec3 sunDir, vec3 colorSunlight)
 {
@@ -653,11 +653,25 @@ vec3 RenderSunDiscRefelction(vec3 worldDir, vec3 sunDir, vec3 colorSunlight)
 	return result;
 }
 
+// Unit of the colour passed to LandAtmosphericScattering / unit of the deferred12 sky
+#ifndef LAND_AP_UNIT
+	#define LAND_AP_UNIT 0.12
+#endif
+
 void LandAtmosphericScattering(inout vec3 color, in vec3 viewPos, vec3 worldDir, vec3 worldSunVector)
 {
 	float dist = length(viewPos);
 
 	dist *= pow(saturate(eyeBrightnessSmooth.y / 240.), 6.0);
+
+	#if ATMOSPHERE_MODEL == 1
+	{
+		vec3 T;
+		vec3 L = AtmoAerialPerspective(normalize(worldDir), dist * ATMOSPHERE_AERIAL_PERSPECTIVE, worldSunVector, nightBrightness, 10, T);
+		color = color * T + L * LAND_AP_UNIT;
+		return;
+	}
+	#endif
 
 	color *= AtmosphereAbsorption(worldDir, dist * 0.005);
 

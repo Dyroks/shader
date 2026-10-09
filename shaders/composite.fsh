@@ -22,6 +22,7 @@ flat in vec3 colorSkyUp;
 
 #include "/lib/Settings.inc"
 #include "/lib/Uniforms.inc"
+#define LAND_AP_UNIT 0.1   // reflections: colortex1 * 100
 #include "/lib/Common.inc"
 
 #ifdef VOLUMETRIC_CLOUDS
@@ -369,7 +370,7 @@ vec2 Texcoord;
            #endif
            j=DoNightEyeAtNight(j*12.,timeMidnight)*.083333;
            vec3 L=j,A=L;
-           A+=RenderSunDiscRefelction(F.direction,worldSunVector,colorSunlight)*AtmosphereAbsorption(F.direction,AtmosphereExtent)*2000.*cloudSky.a;
+           A+=RenderSunDiscRefelction(F.direction,worldSunVector,colorSunlight)*SkyTransmittance(F.direction)*2000.*cloudSky.a;
            L=TintUnderwaterDepth(A);
            N+=L*.1*l*stainedColor;
            J=114514.;

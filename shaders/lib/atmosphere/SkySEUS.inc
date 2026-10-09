@@ -1,6 +1,6 @@
 // =====================================================================================
 //  SEUS sky / atmosphere functions (moved unchanged from lib/Common.inc so that compute
-//  programs can use them too). To be replaced by the Hillaire 2020 atmosphere (phase 4).
+//  programs can use them too). Used when ATMOSPHERE_MODEL == 0 (see Sky.inc).
 //  Needs: wetness, nightBrightness, SUNLIGHT_BRIGHTNESS.
 // =====================================================================================
 
@@ -128,8 +128,8 @@ vec3 Atmosphere(vec3 worldViewVector, vec3 worldSunVector, float mieAmount, floa
 	return Atmosphere(worldViewVector, worldSunVector, mieAmount, AtmosphereExtent, LdotV, LdotV2);
 }
 
-// Main sky shading function
-vec3 SkyShading(vec3 worldViewVector, vec3 worldSunVector)
+// Main sky shading function (SEUS model, see Sky.inc)
+vec3 SkyShadingSEUS(vec3 worldViewVector, vec3 worldSunVector)
 {
 	float LdotV = dot(worldViewVector, worldSunVector);
 	float LdotV2 = LdotV * LdotV + 1.0;

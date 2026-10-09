@@ -29,6 +29,25 @@ screen.Others.comment=Autres paramètres
 
 # Atmosphere
 # Volumetric clouds
+screen.Sky=Ciel et atmosphère...
+screen.Sky.comment=Modèle d'atmosphère (SEUS ou physique), brume, brume sur le relief lointain
+option.ATMOSPHERE_MODEL=Atmosphère
+option.ATMOSPHERE_MODEL.comment=SEUS : le ciel d'origine. Physique : diffusion précalculée de Hillaire 2020 (Rayleigh, aérosols, ozone, diffusion multiple), cohérente avec la lumière du soleil, correcte vue de n'importe quelle altitude, avec une brume physique sur le relief et les nuages lointains.
+value.ATMOSPHERE_MODEL.0=SEUS
+value.ATMOSPHERE_MODEL.1=Physique
+option.ATMOSPHERE_HAZE=Brume
+option.ATMOSPHERE_HAZE.comment=Atmosphère physique : quantité d'aérosols dans les premiers kilomètres (visibilité). La pluie en ajoute.
+value.ATMOSPHERE_HAZE.0=Air très pur
+value.ATMOSPHERE_HAZE.1=Air pur
+value.ATMOSPHERE_HAZE.2=Dégagé
+value.ATMOSPHERE_HAZE.3=Normal
+value.ATMOSPHERE_HAZE.4=Légèrement brumeux
+value.ATMOSPHERE_HAZE.5=Brumeux
+value.ATMOSPHERE_HAZE.6=Très brumeux
+option.ATMOSPHERE_AERIAL_PERSPECTIVE=Brume sur le relief lointain
+option.ATMOSPHERE_AERIAL_PERSPECTIVE.comment=Atmosphère physique : multiplie la distance utilisée pour la brume sur le terrain. 1,0 = physique (suit l'échelle des nuages). Plus haut pour un effet de profondeur plus marqué.
+option.ATMOSPHERE_SKY_BRIGHTNESS=Luminosité du ciel
+option.ATMOSPHERE_SKY_BRIGHTNESS.comment=Atmosphère physique : luminosité du ciel et de la brume. 1,0 = cohérente physiquement avec la lumière du soleil (plus lumineux que le ciel SEUS).
 screen.Clouds=Nuages...
 screen.Clouds.comment=Nuages volumétriques : qualité, forme, météo et éclairage
 screen.CloudQuality=Qualité des nuages...
@@ -65,7 +84,7 @@ option.CLOUD_DETAIL_DISTANCE.comment=Distance (km) jusqu'à laquelle les petits 
 option.CLOUD_STEP_SCALE=[Perso] Longueur des pas
 option.CLOUD_STEP_SCALE.comment=Multiplicateur de longueur des pas : plus petit = plus fin et plus lent. Utilisé seulement en qualité Personnalisée.
 option.CLOUD_SCALE=Échelle des nuages
-option.CLOUD_SCALE.comment=Taille de tout ce qui concerne les nuages. 1.0 = échelle réelle (un cumulus fait environ 1 km). Réduire pour un monde de taille vanilla. Le rendu reste identique à toute échelle.
+option.CLOUD_SCALE.comment=Taille de tout ce qui concerne les nuages et l'atmosphère physique. 1.0 = échelle réelle (un cumulus fait environ 1 km). Réduire pour un monde de taille vanilla. Le rendu reste identique à toute échelle.
 option.CLOUD_ALTITUDE=Altitude
 option.CLOUD_ALTITUDE.comment=Altitude (Y absolu) de la base des nuages bas.
 option.CLOUD_COVERAGE=Couverture
