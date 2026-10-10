@@ -182,6 +182,15 @@ vec3 GetBloomTap(vec2 coord, const float octave, const vec2 offset)
 	return dualBlurUpSample(colortex7, coord).rgb;
 }
 
+#ifdef AB_BLOOM
+uniform sampler2D bloomAccumSampler;
+
+// Progressive bloom (composite14_a .. composite14_i): every level is already folded into level 1
+vec3 GetBloom(vec2 coord)
+{
+	return dualBlurUpSample(bloomAccumSampler, coord * 0.5 - GetBloomLevelOffset(0.0)) / 5.75902;
+}
+#else
 vec3 GetBloom(vec2 coord)
 {
 	vec3 bloom = vec3(0.0);
@@ -200,3 +209,4 @@ vec3 GetBloom(vec2 coord)
 
 	return bloom;
 }
+#endif

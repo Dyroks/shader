@@ -394,3 +394,5 @@ option.AB_AIR_SHAFTS=Lot 2: near shafts from the air
 option.AB_AIR_SHAFTS.comment=On: near light shafts computed with the light of the air (a quarter of the pixels): thin mist and valley haze shadowed by the terrain, stained glass tint. Off: original godrays (32 steps per pixel, added on top)
 option.AB_GI_CACHE=Lot 2: GI light cache
 option.AB_GI_CACHE.comment=On: the light cache of the GI (second bounce, 202³ cells in 4K) traces half of its cells per frame with twice the blend weight (same response time, a little more noise). Off: all the cells every frame
+option.AB_BLOOM=Lot 2: progressive bloom
+option.AB_BLOOM.comment=On: the bloom levels are combined by a chain of small passes, from the coarsest to the finest, and the final pass reads one level (8 samples per pixel instead of 72). Same look, a little smoother. Off: original bloom

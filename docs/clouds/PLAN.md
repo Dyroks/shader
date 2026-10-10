@@ -65,6 +65,7 @@ temporaire `AB_*` (écran *Comparaison du lot 2*), activée par défaut.
 |---|---|---|---|
 | 2-A | `AB_AIR_SHAFTS` | R1 : faisceaux proches calculés avec la lumière de l'air | à tester |
 | 2-B | `AB_GI_CACHE` | R2 : cache de lumière de la GI retracé par moitié | à tester |
+| 2-C | `AB_BLOOM` | R3 : bloom progressif ; R4 écarté | à tester |
 
 **2-A, faisceaux proches dans l'air** (`AirTerrainShadow.inc`, `Crepuscular.inc`, `composite4_c.csh`) :
 - Les anciens godrays (`composite4.fsh`) faisaient 32 pas sur 100 blocs pour chaque pixel interne, ciel compris,
@@ -87,6 +88,14 @@ Réduire la taille (±80 blocs au lieu de ±101) raccourcirait le second rebond 
 blocs : écarté. Une moitié des cellules est retracée par image, par bandes de 8 lignes (warps entiers actifs ou
 inactifs), avec un poids double (0,05 au lieu de 0,025 : même temps de réponse) ; l'autre moitié suit seulement
 la caméra (copie décalée).
+
+**2-C, bloom progressif** (`composite14_a` à `composite14_i`, `BloomUpsample.glsl`, gain estimé 0,4 à 0,8 ms) :
+la passe finale lisait 9 niveaux × 8 échantillons par pixel 4K. Neuf petits dispatchs remontent les niveaux du plus
+grossier au plus fin dans `bloomAccum` (même disposition que l'atlas de `colortex7`) : niveau k = poids k × niveau k
+flouté + niveau k+1 suréchantillonné avec la même tente. `composite14` ne lit plus que le niveau 1 (8 échantillons).
+Simulation numpy contre l'original : écart moyen 1,7 %, maximum 2,7 % (un peu plus doux).
+R4 (exposition logarithmique) écarté : la chaîne de mipmaps de `colortex3` ne coûte qu'environ 0,1 ms, et une
+moyenne logarithmique changerait la luminosité de toutes les scènes contrastées.
 
 ## Phase 9 : audit performance, lot 1
 
