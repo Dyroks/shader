@@ -397,3 +397,7 @@ option.AB_SURFACES=Lot 1: terrain and water surfaces
 option.AB_SURFACES.comment=On: early depth test kept on the terrain with Parallax, waves computed only for water (not glass, slime or under the physics ocean), wave relief faded out where the waves are nearly flat (far away), Voxy water: normalized view direction for the wave relief, no waves on distant glass. Off: original behaviour
 option.AB_LOD_DISTANCE=Lot 1: Voxy terrain distance
 option.AB_LOD_DISTANCE.comment=On: the aerial perspective of the Voxy terrain uses its real distance (distant mountains get a haze that grows with distance, adjustable with Distant Terrain Haze). Off: original behaviour, the same haze as at the vanilla render distance
+option.AB_POST=Lot 1: post-processing
+option.AB_POST.comment=On: temporal history stored in 16-bit float instead of 32-bit (half the memory traffic), motion blur skipped while the camera does not move. Off: original behaviour. FXAA is now off by default (the temporal reconstruction already smooths the edges) and its pass is skipped when off
+option.AB_POST=Lot 1: post-processing
+option.AB_POST.comment=On: temporal history stored in 16-bit float instead of 32-bit (half the memory traffic), motion blur skipped while the camera does not move. Off: original behaviour. FXAA is now off by default (the temporal reconstruction already smooths the edges) and its pass is skipped when off

@@ -80,7 +80,7 @@
 #define POST_SHARPENING 1.0 // [0.0 0.5 1.0 1.5 2.0 2.5 3.0]
 
 // AntiAliasing
-#define FINAL_FXAA 1 // [0 1]
+#define FINAL_FXAA 0 // [0 1]
 #define PIXEL_LOOK 0 // [0 1]
 #define AA_STYLE 1 // [0 1]
 // #define SKIP_AA
@@ -90,6 +90,7 @@
 #define AB_SUN_SHADOW // Sun shadows: shadow tests skipped when the light cannot reach the surface, stained glass colour read only behind stained glass, ray traced shadow texture offset fixed
 #define AB_SURFACES // Terrain and water surfaces: early depth test kept with parallax, waves only on water, no wave relief where it is invisible, Voxy water fixes
 #define AB_LOD_DISTANCE // Voxy terrain: aerial perspective at its real distance instead of the far plane of the vanilla depth
+#define AB_POST // Post-processing: temporal history (colortex6) in 16-bit float, motion blur skipped when the camera does not move
 
 // Others
 // #define VISUALIZE_DANGEROUS_LIGHT_LEVEL

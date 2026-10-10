@@ -69,6 +69,7 @@ ces options et l'ancien code seront retirés une fois validés.
 | 1-B | `AB_SUN_SHADOW` | O3, O4, V3 : ombres du soleil | à tester |
 | 1-C | `AB_SURFACES` | O5, O6, S3, V4, V9 : surfaces du terrain et de l'eau | à tester |
 | 1-D | `AB_LOD_DISTANCE` | V1 : perspective aérienne du terrain Voxy à sa vraie distance | à tester |
+| 1-E | `AB_POST`, `FINAL_FXAA` | O9, S2, flou de mouvement à l'arrêt ; O8 abandonné | à tester |
 
 **1-A, GI dans le volume de voxels** (gain estimé 1,5 à 4 ms dans un panorama Voxy) :
 - O1 (`deferred.fsh`) : au-delà de `RAY_TRACING_RADIUS` (±167 blocs), `deferred12` remplace la GI par l'ambiance
@@ -122,6 +123,20 @@ Les programmes Voxy ne passent pas par `compile_check.py` : vérifiés avec un e
   profondeur Voxy, comme dans `CloudSurfaceDistance`. Changement visible voulu : les montagnes lointaines prennent
   un voile qui grandit avec la distance (*Brume sur le relief lointain* pour le doser). Le brouillard sous l'eau
   utilise aussi la vraie distance.
+
+**1-E, post-traitement** (gain estimé 0,3 à 0,5 ms) :
+- S2 : FXAA final désactivé par défaut (`FINAL_FXAA` 0) et `composite15` sauté quand il est désactivé : il ne
+  faisait plus qu'une copie 4K. La reconstruction temporelle lisse déjà les bords.
+- O9 : `colortex6` (historique de la reconstruction temporelle en 4K, couleur encodée gamma, exposition < 400)
+  passe de RGBA32F à RGBA16F : moitié moins de trafic mémoire en lecture et en écriture.
+- Flou de mouvement : les deux passes (`composite10`, `composite11`) ne lisent qu'un échantillon quand la caméra est
+  immobile (décalage total < 0,01 pixel). La fusion des deux passes est écartée : leur noyau combiné est une boîte
+  exacte de 25 échantillons ; une passe unique devrait les lire tous, pour un coût équivalent.
+- **O8 abandonné (erreur de l'audit)** : les « copies » des passes plein écran (`deferred`, `composite`,
+  `composite1`…) ne sont pas inutiles. Iris alterne deux textures par tampon écrit ; une passe qui ne dessine
+  qu'un quadrant laisse dans les autres le contenu de l'autre texture, vieux de deux écritures. Les copies gardent les
+  deux textures identiques (exemple : `composite1` recopie le gbuffer complété par l'eau et Voxy, que `composite4`
+  relit). `deferred99` fusionne les translucides Voxy dans le gbuffer : nécessaire aussi.
 
 ## Phase 8 : rayons crépusculaires
 

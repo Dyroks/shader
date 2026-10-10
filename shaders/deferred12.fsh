@@ -64,7 +64,11 @@ const int colortex2Format = RGBA16;
 const int colortex3Format = RGBA16_SNORM;
 const int colortex4Format = RGBA32F;
 const int colortex5Format = RGBA32F;
+#ifdef AB_POST
+const int colortex6Format = RGBA16F; // temporal history (gamma encoded colour, exposure < 400): 16-bit float is enough
+#else
 const int colortex6Format = RGBA32F;
+#endif
 const int colortex7Format = RGBA16F;
 const int colortex17Format = RGBA16;
 const int colortex18Format = RGBA16;
