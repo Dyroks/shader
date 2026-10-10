@@ -1,14 +1,33 @@
 // =====================================================================================
 //  Distant terrain shading: sun shadows of the distant relief and ambient occlusion beyond
-//  the voxel volume, computed by deferred12_a.csh at a quarter of the internal resolution
-//  (farShade), applied by deferred12.
+//  the voxel volume, computed by deferred12_c.csh at a quarter of the internal resolution
+//  (farShade), applied by deferred12. The shadows march a height map of the terrain the camera
+//  has seen (deferred12_a, deferred12_b).
 // =====================================================================================
 
 #ifndef FAR_SHADING_INC
 #define FAR_SHADING_INC
 
-const int farShadowSteps = 24;        // march toward the sun
-const float farShadowReach = 4000.0;  // blocks
+const int farShadowSteps = 40;        // march toward the sun through the height map
+const float farShadowReach = 6000.0;  // blocks
+const float farShadowSoftness = 12.0; // larger = harder shadow edges (penumbra ~ 1/x radian)
+
+// World height map of the terrain seen by the camera (deferred12_a clears, deferred12_b fills,
+// deferred12_c marches it): farHeightSize^2 cells of farHeightCell blocks, toroidal, anchored in
+// the world around the camera; a cell holds the highest surface seen in it (0 = unknown).
+const float farHeightCell = 8.0;
+const int farHeightSize = 2048;
+const int farHeightMagic = 0x5EED;
+
+ivec2 FarHeightOrigin(vec3 cam) {
+	return ivec2(floor(cam.xz / farHeightCell)) - farHeightSize / 2;
+}
+uint FarHeightEncode(float y) {
+	return uint(clamp(y + 4096.0, 1.0, 65535.0) * 16.0);
+}
+float FarHeightDecode(uint v) {
+	return float(v) / 16.0 - 4096.0;
+}
 const int farAOSamples = 8;
 const float farAOStrength = 0.8;
 

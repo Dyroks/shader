@@ -231,7 +231,7 @@ vec3 CalculateSunlightVisibility(vec4 screenSpacePosition, MaterialMask frnQIYJj
 
 	#ifdef AB_FAR_SHADING
 	// outside the shadow map there is no occluder to find (the lookups would read its edge):
-	// lit, the distant relief is shadowed by deferred12_a instead
+	// lit, the distant relief is shadowed by deferred12_c instead
 	vec4 shadowClip = shadowProjection * (shadowModelView * vec4(worldPos, 1.0));
 	if (any(greaterThan(abs(shadowClip.xy / shadowClip.w), vec2(1.0))))
 		return vec3(1.0);
@@ -502,7 +502,7 @@ vec3 SpecularGGX(vec3 N, vec3 V, vec3 L, float roughness, float F0)
    vec3 f=normalize(s.xyz),m=normalize(i.xyz),y=normalize((gbufferModelViewInverse*vec4(v.normal,0.)).xyz),c=normalize((gbufferModelViewInverse*vec4(v.geoNormal,0.)).xyz);
    float r=max(max(abs(a.x),abs(a.y)),abs(a.z));
    #ifdef AB_FAR_SHADING
-   // distant terrain shading (deferred12_a): x = ambient occlusion, y = sun visibility
+   // distant terrain shading (deferred12_c): x = ambient occlusion, y = sun visibility
    vec2 farShade=vec2(1.);
    if(x.sky<.5)
      farShade=FarShadeUpsample(ivec2(Texcoord*ScreenSize),length(s.xyz));
@@ -545,7 +545,7 @@ vec3 SpecularGGX(vec3 N, vec3 V, vec3 L, float roughness, float F0)
            vec3 F=FromSH(skySHR,skySHG,skySHB,y);
            F*=v.mcLightmap.y;
            #ifdef AB_FAR_SHADING
-           F*=farShade.x;   // relief of the terrain beyond the GI (deferred12_a)
+           F*=farShade.x;   // relief of the terrain beyond the GI (deferred12_c)
            #endif
            vec3 R=F*4.5;
            R+=v.mcLightmap.x*colorTorchlight*.0925;
@@ -575,7 +575,7 @@ vec3 SpecularGGX(vec3 N, vec3 V, vec3 L, float roughness, float F0)
            sunVisibility*=CloudShadowLookup(a.xyz,worldLightVector);
            #endif
            #ifdef AB_FAR_SHADING
-           sunVisibility*=farShade.y;   // shadows of the distant relief (deferred12_a)
+           sunVisibility*=farShade.y;   // shadows of the distant relief (deferred12_c)
            #endif
            if(x.leaves<.5&&dot(y,worldLightVector)<=0.)
              sunVisibility=0.;

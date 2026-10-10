@@ -99,7 +99,7 @@ Simulation numpy contre l'original : écart moyen 1,7 %, maximum 2,7 % (un peu p
 R4 (exposition logarithmique) écarté : la chaîne de mipmaps de `colortex3` ne coûte qu'environ 0,1 ms, et une
 moyenne logarithmique changerait la luminosité de toutes les scènes contrastées.
 
-**2-D, ombrage du relief lointain** (`deferred12_a.csh`, `FarShading.inc`, `deferred12.fsh`, coût estimé 0,3 à
+**2-D, ombrage du relief lointain** (`deferred12_a/b/c.csh`, `FarShading.inc`, `deferred12.fsh`, coût estimé 0,3 à
 0,6 ms) : la carte d'ombre couvre `shadowDistance` et ne contient pas le terrain Voxy, et au-delà du volume de
 voxels la GI devient une ambiance plate. Une passe compute au quart de la résolution interne (un pixel par bloc
 2×2, différent à chaque image, comme `composite4_c`) écrit `farShade` ; `deferred12` le suréchantillonne avec des
@@ -138,6 +138,20 @@ taches isolées. Analyse :
   objet bien plus proche que le point testé (le mur devant la caméra, le parapente). Un obstacle doit maintenant
   être à au moins 70-80 % de la profondeur du point testé (une crête entre la vallée et le soleil) ; occlusion
   progressive au lieu de binaire.
+
+**Retour du test suivant** : pièce aussi lumineuse que SEUS d'origine ; taches et traînées toujours là, mais
+comme dans SEUS d'origine. Ombres lointaines meilleures, mais toujours instables près d'un obstacle et parfois
+bruitées. Cause : la profondeur de l'écran ne garde que la surface la plus proche ; un obstacle proche cache la crête
+qui projette l'ombre, quelle que soit la règle d'épaisseur. Remplacement de V7 par une **carte de hauteur du monde** :
+- `deferred12_a` : carte 2048² de cellules de 8 blocs (±8 km), torique et ancrée dans le monde ; efface les cellules
+  qui entrent dans la fenêtre (toute la carte au premier passage : état `farHeightState`, valeur magique).
+- `deferred12_b` : chaque pixel au quart de résolution inscrit la hauteur de sa surface (terrain vanilla et Voxy,
+  main, joueur et entités exclus) avec `imageAtomicMax` : la carte garde tout ce que la caméra a vu.
+- `deferred12_c` : marche vers le soleil dans la carte (40 pas géométriques jusqu'à 6000 blocs, hauteur bilinéaire),
+  ombre douce par la hauteur de dégagement du rayon (pénombre ~1/12 rad). Indépendante de la caméra, sans bruit
+  hors gigue des pas. Les pixels dans la carte d'ombre ignorent les obstacles qu'elle contient déjà.
+Limites : un relief jamais vu n'ombre rien (il s'inscrit dès qu'il passe à l'écran) ; pas de surplombs (hauteur
+maximale par cellule).
 
 ## Phase 9 : audit performance, lot 1
 
