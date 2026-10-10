@@ -36,6 +36,10 @@ flat in vec4 skySHB;
 #endif
 #include "/lib/Materials.inc"
 #include "/lib/GBufferData.inc"
+#ifdef AB_FAR_SHADING
+#define FAR_SHADE_UPSAMPLE
+#include "/lib/FarShading.inc"
+#endif
 
 
 const int shadowMapResolution = 8192; // Higher value impacts performance costs, but can get better shadow, and increase path tracing distance. Please increase the shadow distance at the same time. 4096 - 80 blocks path tracing. 8192 - 160 blocks path tracing. 16384 - 300 blocks path tracing, requires at least 6GB VRAM. 34768 - 530 blocks of path tracing, requires at least 20GB VRAM. [4096 8192 16384 32768]
@@ -224,6 +228,14 @@ vec3 CalculateSunlightVisibility(vec4 screenSpacePosition, MaterialMask frnQIYJj
 {
 
 	vec3 worldPos = (gbufferModelViewInverse * screenSpacePosition).xyz;
+
+	#ifdef AB_FAR_SHADING
+	// outside the shadow map there is no occluder to find (the lookups would read its edge):
+	// lit, the distant relief is shadowed by deferred12_a instead
+	vec4 shadowClip = shadowProjection * (shadowModelView * vec4(worldPos, 1.0));
+	if (any(greaterThan(abs(shadowClip.xy / shadowClip.w), vec2(1.0))))
+		return vec3(1.0);
+	#endif
 	float worldDsitance = length(worldPos.xyz);
 
 
@@ -489,6 +501,12 @@ vec3 SpecularGGX(vec3 N, vec3 V, vec3 L, float roughness, float F0)
    vec4 a=gbufferModelViewInverse*vec4(s.xyz,1.),i=gbufferModelViewInverse*vec4(s.xyz,0.);
    vec3 f=normalize(s.xyz),m=normalize(i.xyz),y=normalize((gbufferModelViewInverse*vec4(v.normal,0.)).xyz),c=normalize((gbufferModelViewInverse*vec4(v.geoNormal,0.)).xyz);
    float r=max(max(abs(a.x),abs(a.y)),abs(a.z));
+   #ifdef AB_FAR_SHADING
+   // distant terrain shading (deferred12_a): x = ambient occlusion, y = sun visibility
+   vec2 farShade=vec2(1.);
+   if(x.sky<.5)
+     farShade=FarShadeUpsample(ivec2(Texcoord*ScreenSize),length(s.xyz));
+   #endif
    vec3 n=vec3(0.),t=y;
    if(x.sky>.5)
      {
@@ -526,6 +544,9 @@ vec3 SpecularGGX(vec3 N, vec3 V, vec3 L, float roughness, float F0)
          {
            vec3 F=FromSH(skySHR,skySHG,skySHB,y);
            F*=v.mcLightmap.y;
+           #ifdef AB_FAR_SHADING
+           F*=farShade.x;   // relief of the terrain beyond the GI (deferred12_a)
+           #endif
            vec3 R=F*4.5;
            R+=v.mcLightmap.x*colorTorchlight*.0925;
            R*=v.albedo.xyz;
@@ -552,6 +573,9 @@ vec3 SpecularGGX(vec3 N, vec3 V, vec3 L, float roughness, float F0)
            #endif
            #if defined VOLUMETRIC_CLOUDS && defined CLOUD_SHADOWS
            sunVisibility*=CloudShadowLookup(a.xyz,worldLightVector);
+           #endif
+           #ifdef AB_FAR_SHADING
+           sunVisibility*=farShade.y;   // shadows of the distant relief (deferred12_a)
            #endif
            if(x.leaves<.5&&dot(y,worldLightVector)<=0.)
              sunVisibility=0.;

@@ -396,3 +396,5 @@ option.AB_GI_CACHE=Lot 2: GI light cache
 option.AB_GI_CACHE.comment=On: the light cache of the GI (second bounce, 202³ cells in 4K) traces half of its cells per frame with twice the blend weight (same response time, a little more noise). Off: all the cells every frame
 option.AB_BLOOM=Lot 2: progressive bloom
 option.AB_BLOOM.comment=On: the bloom levels are combined by a chain of small passes, from the coarsest to the finest, and the final pass reads one level (8 samples per pixel instead of 72). Same look, a little smoother. Off: original bloom
+option.AB_FAR_SHADING=Lot 2: distant terrain shading
+option.AB_FAR_SHADING.comment=On: distant mountains (Voxy included) cast sun shadows found through the depth buffer (the occluder must be on screen), ambient occlusion reveals the relief beyond the GI range, no soft shadow lookups outside the shadow map. Off: original behaviour (no shadow beyond the shadow map, flat ambient light beyond the GI)

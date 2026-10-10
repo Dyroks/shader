@@ -393,3 +393,5 @@ option.AB_GI_CACHE=Lot 2 : cache de lumière de la GI
 option.AB_GI_CACHE.comment=Activé : le cache de lumière de la GI (second rebond, 202³ cellules en 4K) retrace la moitié de ses cellules par image avec un poids double (même temps de réponse, un peu plus de bruit). Désactivé : toutes les cellules à chaque image
 option.AB_BLOOM=Lot 2 : bloom progressif
 option.AB_BLOOM.comment=Activé : les niveaux du bloom sont combinés par une chaîne de petites passes, du plus grossier au plus fin, et la passe finale lit un seul niveau (8 lectures par pixel au lieu de 72). Même rendu, un peu plus doux. Désactivé : bloom d'origine
+option.AB_FAR_SHADING=Lot 2 : ombrage du relief lointain
+option.AB_FAR_SHADING.comment=Activé : les montagnes lointaines (Voxy compris) projettent des ombres du soleil trouvées dans la profondeur de l'écran (l'obstacle doit être visible), une occlusion ambiante fait ressortir le relief au-delà de la portée de la GI, plus d'ombres douces lues hors de la carte d'ombre. Désactivé : comportement d'origine (pas d'ombre au-delà de la carte d'ombre, lumière ambiante plate au-delà de la GI)

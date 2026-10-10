@@ -66,6 +66,7 @@ temporaire `AB_*` (écran *Comparaison du lot 2*), activée par défaut.
 | 2-A | `AB_AIR_SHAFTS` | R1 : faisceaux proches calculés avec la lumière de l'air | à tester |
 | 2-B | `AB_GI_CACHE` | R2 : cache de lumière de la GI retracé par moitié | à tester |
 | 2-C | `AB_BLOOM` | R3 : bloom progressif ; R4 écarté | à tester |
+| 2-D | `AB_FAR_SHADING` | S7, V6, V7 : ombres et occlusion du relief lointain | à tester |
 
 **2-A, faisceaux proches dans l'air** (`AirTerrainShadow.inc`, `Crepuscular.inc`, `composite4_c.csh`) :
 - Les anciens godrays (`composite4.fsh`) faisaient 32 pas sur 100 blocs pour chaque pixel interne, ciel compris,
@@ -96,6 +97,21 @@ flouté + niveau k+1 suréchantillonné avec la même tente. `composite14` ne li
 Simulation numpy contre l'original : écart moyen 1,7 %, maximum 2,7 % (un peu plus doux).
 R4 (exposition logarithmique) écarté : la chaîne de mipmaps de `colortex3` ne coûte qu'environ 0,1 ms, et une
 moyenne logarithmique changerait la luminosité de toutes les scènes contrastées.
+
+**2-D, ombrage du relief lointain** (`deferred12_a.csh`, `FarShading.inc`, `deferred12.fsh`, coût estimé 0,3 à
+0,6 ms) : la carte d'ombre couvre `shadowDistance` et ne contient pas le terrain Voxy, et au-delà du volume de
+voxels la GI devient une ambiance plate. Une passe compute au quart de la résolution interne (un pixel par bloc
+2×2, différent à chaque image, comme `composite4_c`) écrit `farShade` ; `deferred12` le suréchantillonne avec des
+poids selon la distance.
+- V7 : marche vers le soleil dans la profondeur de l'écran (24 pas géométriques jusqu'à 4000 blocs, épaisseur
+  supposée des obstacles : distance parcourue + 32 blocs). Les pixels proches (moins de 0,75 × `far`) ne comptent
+  que le terrain LOD comme obstacle : la carte d'ombre gère le reste. Limite : l'obstacle doit être à l'écran.
+- V6 : occlusion ambiante (8 échantillons dans l'hémisphère, rayon 4 % de la distance, 8 à 64 blocs, force 0,8)
+  sur la lumière du ciel qui remplace la GI au-delà du volume.
+- S7 : `CalculateSunlightVisibility` rend « éclairé » hors de la carte d'ombre au lieu de lire son bord (PCSS de
+  85 lectures sauté).
+À vérifier en jeu : ombres des sommets sur les vallées lointaines au coucher du soleil, bruit ou faux ombrages
+(précision de la profondeur Voxy au loin), force de l'occlusion.
 
 ## Phase 9 : audit performance, lot 1
 
