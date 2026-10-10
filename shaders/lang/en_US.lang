@@ -401,3 +401,7 @@ option.AB_POST=Lot 1: post-processing
 option.AB_POST.comment=On: temporal history stored in 16-bit float instead of 32-bit (half the memory traffic), motion blur skipped while the camera does not move. Off: original behaviour. FXAA is now off by default (the temporal reconstruction already smooths the edges) and its pass is skipped when off
 option.AB_POST=Lot 1: post-processing
 option.AB_POST.comment=On: temporal history stored in 16-bit float instead of 32-bit (half the memory traffic), motion blur skipped while the camera does not move. Off: original behaviour. FXAA is now off by default (the temporal reconstruction already smooths the edges) and its pass is skipped when off
+option.AB_CLOUD_WEATHER=Lot 1: cloud weather maps
+option.AB_CLOUD_WEATHER.comment=On: the two weather maps of the clouds (2048² and 1024²) are refreshed one quarter per frame, and fully when the camera moves to another map texel (every 48 or 400 blocks). Off: original behaviour, both maps fully every frame
+option.AB_GI_LOOP=Lot 1: GI loop
+option.AB_GI_LOOP.comment=On: the GI rays walk the empty voxels in a short loop and test the block shapes outside it (same result, the speed gain depends on the graphics card: compare the FPS). Off: original loop

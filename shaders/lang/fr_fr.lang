@@ -398,3 +398,7 @@ option.AB_POST=Lot 1 : post-traitement
 option.AB_POST.comment=Activé : historique temporel stocké en flottants 16 bits au lieu de 32 (moitié moins de trafic mémoire), flou de mouvement sauté quand la caméra ne bouge pas. Désactivé : comportement d'origine. Le FXAA est maintenant désactivé par défaut (la reconstruction temporelle lisse déjà les bords) et sa passe est sautée quand il est désactivé
 option.AB_POST=Lot 1 : post-traitement
 option.AB_POST.comment=Activé : historique temporel stocké en flottants 16 bits au lieu de 32 (moitié moins de trafic mémoire), flou de mouvement sauté quand la caméra ne bouge pas. Désactivé : comportement d'origine. Le FXAA est maintenant désactivé par défaut (la reconstruction temporelle lisse déjà les bords) et sa passe est sautée quand il est désactivé
+option.AB_CLOUD_WEATHER=Lot 1 : cartes météo des nuages
+option.AB_CLOUD_WEATHER.comment=Activé : les deux cartes météo des nuages (2048² et 1024²) sont recalculées par quart à chaque image, et entièrement quand la caméra change de texel de carte (tous les 48 ou 400 blocs). Désactivé : comportement d'origine, les deux cartes entières à chaque image
+option.AB_GI_LOOP=Lot 1 : boucle de la GI
+option.AB_GI_LOOP.comment=Activé : les rayons de GI parcourent les voxels vides dans une boucle courte et testent la forme des blocs en dehors (même résultat, le gain dépend de la carte graphique : compare les FPS). Désactivé : boucle d'origine

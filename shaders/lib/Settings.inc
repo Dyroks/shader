@@ -91,6 +91,8 @@
 #define AB_SURFACES // Terrain and water surfaces: early depth test kept with parallax, waves only on water, no wave relief where it is invisible, Voxy water fixes
 #define AB_LOD_DISTANCE // Voxy terrain: aerial perspective at its real distance instead of the far plane of the vanilla depth
 #define AB_POST // Post-processing: temporal history (colortex6) in 16-bit float, motion blur skipped when the camera does not move
+#define AB_CLOUD_WEATHER // Clouds: weather maps refreshed one quarter per frame (fully when the camera changes map texel)
+#define AB_GI_LOOP // Global illumination: two level voxel loop (empty voxels in a short loop, shape test outside it)
 
 // Others
 // #define VISUALIZE_DANGEROUS_LIGHT_LEVEL

@@ -70,6 +70,7 @@ ces options et l'ancien code seront retirés une fois validés.
 | 1-C | `AB_SURFACES` | O5, O6, S3, V4, V9 : surfaces du terrain et de l'eau | à tester |
 | 1-D | `AB_LOD_DISTANCE` | V1 : perspective aérienne du terrain Voxy à sa vraie distance | à tester |
 | 1-E | `AB_POST`, `FINAL_FXAA` | O9, S2, flou de mouvement à l'arrêt ; O8 abandonné | à tester |
+| 1-F | `AB_CLOUD_WEATHER`, `AB_GI_LOOP` | O12 : cartes météo par quarts ; O10 : boucle de GI à deux niveaux | à tester |
 
 **1-A, GI dans le volume de voxels** (gain estimé 1,5 à 4 ms dans un panorama Voxy) :
 - O1 (`deferred.fsh`) : au-delà de `RAY_TRACING_RADIUS` (±167 blocs), `deferred12` remplace la GI par l'ambiance
@@ -137,6 +138,17 @@ Les programmes Voxy ne passent pas par `compile_check.py` : vérifiés avec un e
   qu'un quadrant laisse dans les autres le contenu de l'autre texture, vieux de deux écritures. Les copies gardent les
   deux textures identiques (exemple : `composite1` recopie le gbuffer complété par l'eau et Voxy, que `composite4`
   relit). `deferred99` fusionne les translucides Voxy dans le gbuffer : nécessaire aussi.
+
+**1-F, cartes météo et boucle de GI** :
+- O12 (`begin_a.csh`, `begin_b.csh`, gain estimé ~0,5 ms) : une rangée de groupes de travail sur quatre par image.
+  La carte est ancrée sur le texel de la caméra : elle est recalculée entièrement à l'image où ce texel change
+  (tous les 48 ou 400 blocs) et aux 4 premières images. Un texel en retard représente donc toujours le bon endroit,
+  avec 1 à 3 images de retard sur le vent (une petite fraction de texel). Après un rechargement des shaders ou un
+  saut de temps, la carte se complète en 4 images.
+- O10 (`deferred.fsh`, gain incertain, à mesurer) : boucle à deux niveaux (Aila et Laine 2009). Une boucle courte
+  parcourt les voxels vides ; le test de forme des blocs et les lectures de texture se font en dehors, une fois par
+  voxel non vide. Mêmes pas et même résultat ; les fils d'un warp n'attendent plus à chaque pas le test de forme
+  d'un voisin. Le nombre de registres ne change pas (il est fixé pour tout le shader) : le gain dépend du GPU.
 
 ## Phase 8 : rayons crépusculaires
 

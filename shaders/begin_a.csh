@@ -22,6 +22,15 @@ layout(rgba16f) uniform writeonly image3D cloudWeatherNear;
 void main() {
 	#ifdef VOLUMETRIC_CLOUDS
 		ivec2 id = ivec2(gl_GlobalInvocationID.xy);
+		#ifdef AB_CLOUD_WEATHER
+		// Time sliced: one row of work groups in four per frame. The map is anchored to the camera
+		// texel, so the whole map is refreshed on the frame that texel changes (and on the first
+		// frames): a stale texel always holds the right place, only 1 to 3 frames of wind drift
+		// behind (a small fraction of a texel).
+		bool full = frameCounter < 4 ||
+			any(notEqual(floor(cameraPosition.xz / cloudWeatherNearTexel), floor(previousCameraPosition.xz / cloudWeatherNearTexel)));
+		if (!full && ((int(gl_WorkGroupID.y) + frameCounter) & 3) != 0) return;
+		#endif
 		float time = CloudTime();
 		vec2 q = CloudWeatherTexelWorld(id, cloudWeatherNearTexel, cloudWeatherNearSize) - CloudWindOffset(time);
 		vec4 a, b;
