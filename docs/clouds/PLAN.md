@@ -67,6 +67,7 @@ ces options et l'ancien code seront retirés une fois validés.
 |---|---|---|---|
 | 1-A | `AB_GI_VOLUME` | O1, O2, O7, O11, V2 : GI et reflets limités au volume de voxels | à tester |
 | 1-B | `AB_SUN_SHADOW` | O3, O4, V3 : ombres du soleil | à tester |
+| 1-C | `AB_SURFACES` | O5, O6, S3, V4, V9 : surfaces du terrain et de l'eau | à tester |
 
 **1-A, GI dans le volume de voxels** (gain estimé 1,5 à 4 ms dans un panorama Voxy) :
 - O1 (`deferred.fsh`) : au-delà de `RAY_TRACING_RADIUS` (±167 blocs), `deferred12` remplace la GI par l'ambiance
@@ -94,6 +95,25 @@ profondes près du bord vertical du volume (les rayons qui sortent voient mainte
   tests de profondeur des vitraux restent ; un test préalable de quelques lectures aurait pu manquer un vitrail fin.)
 - V3 : `RayTracedShadow` écrasait le décalage de texture (`=` au lieu de `+=`) : seule la face Z lisait le bon texel
   pour décider si un bloc ajouré (feuillage, vitre…) arrête le rayon. Changement visible possible sur ces blocs.
+
+**1-C, surfaces du terrain et de l'eau** (gain estimé 0,3 à 1,5 ms quand beaucoup d'eau est visible ; O5 ne sert
+qu'avec Parallaxe activée et un pack de textures avec relief) :
+- O5 (`gbuffers_terrain.fsh.glsl`) : la parallaxe écrit `gl_FragDepth`, ce qui coupait l'élimination anticipée des
+  pixels cachés. Déclaré `depth_greater` (GL_ARB_conservative_depth) : la parallaxe ne fait qu'éloigner la surface.
+  Sans relief, la profondeur d'origine est réécrite telle quelle. Pas de garde `#ifdef GL_ARB_conservative_depth` :
+  le préprocesseur d'Iris l'évaluerait comme indéfinie. `compile_check.py` valide ce fichier en GLSL 4.20.
+- O6 (`gbuffers_water.fsh.glsl`) : vagues calculées seulement pour l'eau et les autres translucides qui les
+  utilisent (pas le verre teinté, le slime, ni sous l'océan de Physics Mod, qui les jetaient).
+- S3 : relief des vagues (jusqu'à 60 pas × 6 lectures) estompé puis supprimé là où les vagues sont presque plates :
+  décalage × `smoothstep(0.15, 0.3, atténuation des vagues)`, sans coupure. Vanilla : l'atténuation est calculée une
+  fois (le `fwidth` dans la boucle était indéfini). Changement visible minime : motif des vagues lointaines décalé.
+- V9 (`voxy_water.frag`) : la direction de vue du relief des vagues n'était pas normalisée (position de vue : pas de
+  plusieurs dizaines de blocs). Cause probable des coupures entre tronçons sur l'eau Voxy, à confirmer.
+- V4 (`voxy_water.frag`) : `matID == 7.0` testé après `+= 0.1` : le verre lointain recevait des vagues.
+  Les vagues ne sont plus calculées que pour l'eau Voxy.
+
+Les programmes Voxy ne passent pas par `compile_check.py` : vérifiés avec un en-tête qui simule celui de Voxy
+(uniformes de `voxy.json`, structure `VoxyFragmentParameters`).
 
 ## Phase 8 : rayons crépusculaires
 

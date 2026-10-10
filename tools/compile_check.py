@@ -73,6 +73,10 @@ def apply_overrides(src, overrides):
 def compile_one(path, defines, overrides):
     stage = STAGES[os.path.splitext(path)[1]]
     src = apply_overrides(resolve(path), overrides)
+    if "depth_greater" in src:
+        # GL_ARB_conservative_depth: supported by the drivers Iris runs on, unknown to glslang in 3.30;
+        # validate as 4.20 where the depth layout qualifier is core
+        src = src.replace("#version 330 compatibility", "#version 420 compatibility", 1)
     lines = src.split("\n")
     inject = "\n".join(f"#define {d}" for d in IRIS_DEFINES + defines)
     for i, l in enumerate(lines):

@@ -393,3 +393,5 @@ option.AB_GI_VOLUME=Lot 1: GI inside the voxel volume
 option.AB_GI_VOLUME.comment=On: no GI tracing beyond the voxel volume (the sky ambient used there is stored directly), GI, light cache and reflection rays stop when they leave the volume, no voxel reflections for distant water, no denoising of the sky or of pixels beyond the volume, Voxy projection fixed in the denoiser. Off: original behaviour
 option.AB_SUN_SHADOW=Lot 1: sun shadows
 option.AB_SUN_SHADOW.comment=On: shadow tests skipped where the sun cannot light the surface (faces turned away, caves, cloud shadow, shadow already found), stained glass colour read only behind stained glass, fixed texture lookup of the ray traced shadow (leaves and open blocks on two faces out of three). Off: original behaviour
+option.AB_SURFACES=Lot 1: terrain and water surfaces
+option.AB_SURFACES.comment=On: early depth test kept on the terrain with Parallax, waves computed only for water (not glass, slime or under the physics ocean), wave relief faded out where the waves are nearly flat (far away), Voxy water: normalized view direction for the wave relief, no waves on distant glass. Off: original behaviour

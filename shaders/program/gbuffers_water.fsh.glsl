@@ -38,6 +38,12 @@ vec4 textureSmooth(in vec2 coord)
 	return texture2D(noisetex, coord);
 }
 
+#ifdef AB_SURFACES
+// Wave amplitude fade with the pixel footprint, computed once in main(): fwidth() inside the parallax
+// loop (divergent control flow) was undefined
+float waveFade = 1.0;
+#endif
+
 float AlmostIdentity(in float x)
 {
 	if (x > 0.2) return x;
@@ -86,7 +92,11 @@ float GetWaves(vec3 position)
   allwaves += wave;
 
   allwaves /= 80.1;
+  #ifdef AB_SURFACES
+  allwaves *= waveFade;
+  #else
   allwaves /= 1.0 + dot(fwidth(position), vec3(10.0));
+  #endif
 
   return allwaves;
 }
@@ -94,6 +104,13 @@ float GetWaves(vec3 position)
 vec3 GetWaterParallaxCoord(in vec3 position)
 {
 	vec3 parallaxCoord = position.xyz;
+
+	#ifdef AB_SURFACES
+	// The relief fades out with the waves themselves: none where they are nearly flat (far away)
+	float parallaxWeight = smoothstep(0.15, 0.3, waveFade);
+	if (parallaxWeight <= 0.0)
+		return position;
+	#endif
 
 	vec3 stepScale = vec3(0.6f * WATER_WAVE_HEIGHT, 0.6f * WATER_WAVE_HEIGHT, 1.0f) * 0.5;
 
@@ -112,6 +129,9 @@ vec3 GetWaterParallaxCoord(in vec3 position)
 			sampleHeight = GetWaves(position + vec3(pCoord.x, 0.0f, pCoord.y));
 		}
 
+	#ifdef AB_SURFACES
+	pCoord.xy *= parallaxWeight;
+	#endif
 	parallaxCoord = position.xyz + vec3(pCoord.x, 0.0f, pCoord.y);
 
 	return parallaxCoord;
@@ -259,7 +279,17 @@ void main() {
 	matID += 0.1f;
 
 	vec3 geoNormal = normal;
+	#ifdef AB_SURFACES
+	// waves only where they are used: not on stained glass and slime, not under the physics ocean
+	vec3 wavesNormal = vec3(0.0, 0.0, 1.0);
+	#ifndef PHYSICS_OCEAN
+	waveFade = 1.0 / (1.0 + dot(fwidth(worldPosition), vec3(10.0)));
+	if (isStainedGlass < 0.5 && isSlime < 0.5)
+		wavesNormal = GetWavesNormal(worldPosition);
+	#endif
+	#else
 	vec3 wavesNormal = GetWavesNormal(worldPosition);
+	#endif
 	#ifdef PHYSICS_OCEAN
         #ifndef PHYSICS_OCEAN_V2
             physics_waveData.normal.xz *= 0.5;
