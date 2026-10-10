@@ -66,6 +66,7 @@ ces options et l'ancien code seront retirés une fois validés.
 | Partie | Option | Contenu | État |
 |---|---|---|---|
 | 1-A | `AB_GI_VOLUME` | O1, O2, O7, O11, V2 : GI et reflets limités au volume de voxels | à tester |
+| 1-B | `AB_SUN_SHADOW` | O3, O4, V3 : ombres du soleil | à tester |
 
 **1-A, GI dans le volume de voxels** (gain estimé 1,5 à 4 ms dans un panorama Voxy) :
 - O1 (`deferred.fsh`) : au-delà de `RAY_TRACING_RADIUS` (±167 blocs), `deferred12` remplace la GI par l'ambiance
@@ -83,6 +84,16 @@ ces options et l'ancien code seront retirés une fois validés.
 
 À vérifier en jeu : FPS dans la vue de référence ; transition GI / ambiance vers 160-170 blocs ; GI des vallées
 profondes près du bord vertical du volume (les rayons qui sortent voient maintenant le ciel).
+
+**1-B, ombres du soleil** (`deferred12.fsh`, gain estimé 0,5 à 2 ms) :
+- O3 : même produit, facteurs bon marché d'abord (fuite de lumière en grotte, ombre des nuages, face tournée à
+  l'opposé de la lumière sauf feuillage). L'ombre par rayon, l'ombre en espace écran puis les ombres douces (PCSS,
+  9 + 75 lectures) ne sont calculées que si le produit n'est pas déjà nul. Image identique.
+- O4 : les 25 lectures de couleur des vitraux sont faites dans une seconde boucle, seulement si un échantillon est
+  derrière un vitrail. Sans vitrail, `mix()` rendait le résultat inchangé : image identique. (Version exacte : les 25
+  tests de profondeur des vitraux restent ; un test préalable de quelques lectures aurait pu manquer un vitrail fin.)
+- V3 : `RayTracedShadow` écrasait le décalage de texture (`=` au lieu de `+=`) : seule la face Z lisait le bon texel
+  pour décider si un bloc ajouré (feuillage, vitre…) arrête le rayon. Changement visible possible sur ces blocs.
 
 ## Phase 8 : rayons crépusculaires
 

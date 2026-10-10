@@ -87,6 +87,7 @@
 
 // Lot 1 A/B (temporary: compare the optimizations in game, then removed)
 #define AB_GI_VOLUME // Global illumination: no tracing outside the voxel volume (filled with the ambient light deferred12 uses there), rays stop when they leave the volume
+#define AB_SUN_SHADOW // Sun shadows: shadow tests skipped when the light cannot reach the surface, stained glass colour read only behind stained glass, ray traced shadow texture offset fixed
 
 // Others
 // #define VISUALIZE_DANGEROUS_LIGHT_LEVEL
