@@ -5,7 +5,6 @@
 // BLOOM_LEVEL (1..9) is defined by the including program, before workGroupsRender.
 layout(local_size_x = 8, local_size_y = 8) in;
 
-#ifdef AB_BLOOM
 uniform sampler2D colortex7;
 uniform sampler2D bloomAccumSampler;
 layout(rgba16f) uniform writeonly image2D bloomAccum;
@@ -37,10 +36,8 @@ vec3 BloomTent(vec2 uv) {
 	c += textureLod(bloomAccumSampler, uv + vec2( 0.0,-1.0) * ScreenTexel, 0.0).rgb * (1.0 / 12.0);
 	return c;
 }
-#endif
 
 void main() {
-	#ifdef AB_BLOOM
 		const float weights[9] = float[9](0.90909, 0.82645, 0.75131, 0.68301, 0.62092, 0.56447, 0.51316, 0.46651, 0.42410);
 		vec2 screen = vec2(viewWidth, viewHeight);
 		float octave = exp2(float(BLOOM_LEVEL));
@@ -59,5 +56,4 @@ void main() {
 			c += BloomTent(x / (octave * 2.0) - GetBloomLevelOffset(float(BLOOM_LEVEL)));
 		#endif
 		imageStore(bloomAccum, px, vec4(c, 1.0));
-	#endif
 }

@@ -17,7 +17,8 @@ Base du pack : SEUS PTGI HRR 2.1 GFME, Iris 1.11.7, Minecraft 26.3, Voxy.
 | 7 | Forme et éclairage des cumulus (retour : trop ronds, adoucis, blancs partout) : forme en chou-fleur, surface trouvée précisément, éclairage calibré sur une référence par path tracing, 2 bugs anciens corrigés | ✅ testée en jeu (« beaucoup mieux », assombrissement brusque sous la couche moyenne corrigé ensuite) |
 | 8 | Rayons crépusculaires : nouvelle carte d'ombre des nuages en espace lumière (2 cascades, ±80 km), ombre des nuages dans l'air intégrée avec l'atmosphère physique ; 8b : brume des vallées (milieu participant éclairé et ombré par les nuages) | 🧪 8 testée (rayons trop rares et trop faibles) → 8b testée (perte de FPS) → 8c testée (FPS en partie récupérés, bruit) → 8d à tester en jeu |
 | 9 | Audit performance, lot 1 : travail inutile supprimé sans changer l'image, bugs corrigés (voir la section Phase 9) | ✅ testé en jeu (+6 à 7 FPS, aucun bug, rendu stable) ; options de comparaison retirées, code définitif |
-| 10 | Audit, lot 2 : remplacements (faisceaux proches dans l'air, cache de GI, bloom, exposition), ombres lointaines et occlusion (voir la section Phase 10) | 🧪 à tester en jeu, chaque partie comparable (écran *Comparaison du lot 2*) |
+| 10 | Audit, lot 2 : remplacements (faisceaux proches dans l'air, cache de GI, bloom, exposition), ombres lointaines et occlusion (voir la section Phase 10) | ✅ faisceaux dans l'air et bloom définitifs, cache par moitié supprimé ; ombrage lointain encore en option (instable, réévalué en phase 11) |
+| 11 | GI maison : module `lib/gi`, sélecteur de méthode `GI_METHOD` (ReSTIR GI, plus tard Split RC), sortie progressive du code SEUS (voir la section Phase 11 et le [document de suivi](https://claude.ai/code/artifact/c02bd115-300a-45c4-a14d-a9edf9dd3978)) | 🚧 E0 fait, E1 en cours |
 
 La bibliothèque de nuages simulés (prévue en phase 7) est écartée : formes figées et répétitives (décision de l'utilisateur).
 
@@ -55,6 +56,23 @@ Référence : 50-60 FPS à l'arrêt, environ 45 en mouvement, sans nuages.
 
 - **Test 3** : le fantôme sur les surfaces proches est corrigé. Les reflets au centre de l'écran fonctionnent à
   l'arrêt mais traînaient pendant les rotations : corrigé par la reprojection (à confirmer).
+
+## Phase 11 : GI maison (ReSTIR GI) et sortie du code SEUS
+
+Le plan détaillé, l'état des étapes et l'inventaire du code SEUS sont tenus dans le
+[document de suivi](https://claude.ai/code/artifact/c02bd115-300a-45c4-a14d-a9edf9dd3978). Principes :
+- La GI devient un module maison (`lib/gi`) : services partagés (tracé dans les voxels, éclairage au point touché,
+  tirage des directions, plus tard lumières de blocs et cache en hachage) et méthodes interchangeables par
+  `GI_METHOD` (0 = SEUS, temporaire ; 1 = ReSTIR GI ; Split RC à essayer plus tard).
+- Chaque module maison remplace un morceau de SEUS ; le code SEUS correspondant est supprimé dès que le
+  remplacement est validé en jeu. But : plus aucun code SEUS dans le pack.
+- Étapes : E0 préparation, E1 module GI, E2 ReSTIR GI (temporel puis spatial), E3 débruiteur ReLAX allégé, E4
+  lumières de blocs, E5 cache en hachage, E6 finition, E7 Split RC.
+
+**E0** : lot 2 finalisé. Faisceaux proches dans l'air et bloom progressif définitifs ; les anciens godrays dans
+l'air (`composite4.fsh`, seuls les rayons sous l'eau restent) et l'ancien bloom (`GetBloomTap`) sont supprimés ;
+la variante du cache de GI par moitié est supprimée. L'ombrage lointain reste comparable (écran *Comparaison du
+lot 2*). Mesure GPU par passe : procédure dans le document de suivi (RenderDoc ou Nsight Graphics).
 
 ## Phase 10 : audit performance, lot 2
 

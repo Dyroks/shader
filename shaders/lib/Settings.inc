@@ -86,9 +86,6 @@
 // #define SKIP_AA
 
 // Lot 2 A/B (temporary: compare in game, then removed)
-#define AB_AIR_SHAFTS // Near light shafts from the air light (terrain shadow, near mist) instead of the old godrays
-// #define AB_GI_CACHE // GI light cache: half of the cells traced per frame (off: isolated bright spots indoors)
-#define AB_BLOOM // Bloom: progressive upsampling chain, final pass reads one level
 #define AB_FAR_SHADING // Distant terrain: sun shadows through the depth buffer, ambient occlusion beyond the GI, no soft shadow lookups outside the shadow map
 
 // Others

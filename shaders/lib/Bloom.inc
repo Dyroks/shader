@@ -173,16 +173,6 @@ vec3 dualBlurUpSample(sampler2D sampleTex, vec2 uv) {
     return totalColor;
 }
 
-vec3 GetBloomTap(vec2 coord, const float octave, const vec2 offset)
-{
-	coord /= octave;
-	coord -= offset;
-
-	// return GammaToLinear(BicubicTexture(BLOOM_TEX, coord).rgb);
-	return dualBlurUpSample(colortex7, coord).rgb;
-}
-
-#ifdef AB_BLOOM
 uniform sampler2D bloomAccumSampler;
 
 // Progressive bloom (composite14_a .. composite14_i): every level is already folded into level 1
@@ -190,23 +180,3 @@ vec3 GetBloom(vec2 coord)
 {
 	return dualBlurUpSample(bloomAccumSampler, coord * 0.5 - GetBloomLevelOffset(0.0)) / 5.75902;
 }
-#else
-vec3 GetBloom(vec2 coord)
-{
-	vec3 bloom = vec3(0.0);
-
-	bloom += GetBloomTap(coord, 2.0  , vec2(0.0))				 * 0.90909;
-	bloom += GetBloomTap(coord, 4.0  , GetBloomLevelOffset(1.0)) * 0.82645;
-	bloom += GetBloomTap(coord, 8.0  , GetBloomLevelOffset(2.0)) * 0.75131;
-	bloom += GetBloomTap(coord, 16.0 , GetBloomLevelOffset(3.0)) * 0.68301;
-	bloom += GetBloomTap(coord, 32.0 , GetBloomLevelOffset(4.0)) * 0.62092;
-	bloom += GetBloomTap(coord, 64.0 , GetBloomLevelOffset(5.0)) * 0.56447;
-	bloom += GetBloomTap(coord, 128.0, GetBloomLevelOffset(6.0)) * 0.51316;
-	bloom += GetBloomTap(coord, 256.0, GetBloomLevelOffset(7.0)) * 0.46651;
-	bloom += GetBloomTap(coord, 512.0, GetBloomLevelOffset(8.0)) * 0.42410;
-
-	bloom /= 5.75902;
-
-	return bloom;
-}
-#endif

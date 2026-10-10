@@ -139,12 +139,8 @@ vec3 WorldPosToShadowProjPos(vec3 worldPos)
    vec3 vlAdd=vec3(0.);
    if(wetness<.99)
      {
-       #if defined GODRAYS && !defined AIR_TERRAIN_SHADOW
-       if(isEyeInWater<2)
-       #else
-       // above water, the light shafts come from the air light (AirTerrainShadow.inc)
+       // underwater shafts; above water, the light shafts come from the air light (AirTerrainShadow.inc)
        if(eyeInWater)
-       #endif
          {
            float H=BlueNoiseTemporal(texcoord.xy).x,N=100.;
            vec3 C=vec3(0.),Q=gbufferModelViewInverse[3].xyz;
@@ -177,38 +173,16 @@ vec3 WorldPosToShadowProjPos(vec3 worldPos)
                #if defined VOLUMETRIC_CLOUDS && defined CLOUD_SHADOWS
                Z*=CloudShadowTransmittance(CloudShadowOpticalDepth(cloudShadowFrame,W.xyz));
                #endif
-               if(eyeInWater)
-                 {
-                   float ag=shadow2DLod(shadowtex0,vec3(K.xy-vec2(0.,.5),K.z),1).x,ae=(1.-texture2DLod(shadowcolor1,K.xy-vec2(0.,.5),1).x)*512.-(128.+W.y+cameraPosition.y),af=GetCausticsComposite(W,worldLightVector,max(0.,ae));
-                   Z=mix(Z*af,Z,vec3(ag));
-                   if(ae<0.)
-                     continue;
-                   C+=Z*exp(-vec3(0.25, 0.04, 0.01)*(N*A))*(400.0/(pow(ae,2.)+200.)/(1.0+length(W)*0.2));
-                 }
-               else
-                 C+=sqrt(Z*colorSunlight)*.1;
+               float ag=shadow2DLod(shadowtex0,vec3(K.xy-vec2(0.,.5),K.z),1).x,ae=(1.-texture2DLod(shadowcolor1,K.xy-vec2(0.,.5),1).x)*512.-(128.+W.y+cameraPosition.y),af=GetCausticsComposite(W,worldLightVector,max(0.,ae));
+               Z=mix(Z*af,Z,vec3(ag));
+               if(ae<0.)
+                 continue;
+               C+=Z*exp(-vec3(0.25, 0.04, 0.01)*(N*A))*(400.0/(pow(ae,2.)+200.)/(1.0+length(W)*0.2));
              }
-           float vlStrength=0.0;
-           float Z=dot(worldLightVector,c.xyz),K=1.;
-           if(isEyeInWater==0)
-             {
-               if(worldTime<=12500)
-                 vlStrength=pow(abs(worldTime-6000)/6500.,2.0);
-               else if(worldTime<=23500)
-                 vlStrength=pow(abs(worldTime-18000)/5500.,2.0);
-               else
-                 vlStrength=pow(abs(worldTime-30000)/6500.,2.0);
-               vlStrength=vlStrength*0.4+0.5;
-               vlStrength*=Z*0.25+0.75;
-               K=.5/(max(0.,pow(worldLightVector.y,2.)*2.)+.4);
-             }
-           else
-             {
-               vlStrength=dot(refract(worldLightVector,vec3(0.,-1.,0.),.750019),c.xyz);
-               vlStrength=vlStrength*.3+.6;
-             }
+           float vlStrength=dot(refract(worldLightVector,vec3(0.,-1.,0.),.750019),c.xyz);
+           vlStrength=vlStrength*.3+.6;
            float j=PhaseMie(.8,vlStrength,vlStrength*vlStrength+1.);
-           vec3 vl=TintUnderwaterDepth(C*SUNLIGHT_BRIGHTNESS*colorSunlight*vec3(0.046, 0.05175, 0.0575)*j*K*(1.-wetness));
+           vec3 vl=TintUnderwaterDepth(C*SUNLIGHT_BRIGHTNESS*colorSunlight*vec3(0.046, 0.05175, 0.0575)*j*(1.-wetness));
            vlAdd=vl*VOLUMETRIC_LIGHT_STRENGTH;
          }
      }

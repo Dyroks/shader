@@ -15,7 +15,7 @@
 //  shadowProjection, shadowtex0 (sampler2DShadow), shadowcolor. Include before Crepuscular.inc.
 // =====================================================================================
 
-#if defined GODRAYS && defined AB_AIR_SHAFTS && !defined AIR_TERRAIN_SHADOW_INC
+#if defined GODRAYS && !defined AIR_TERRAIN_SHADOW_INC
 #define AIR_TERRAIN_SHADOW_INC
 #define AIR_TERRAIN_SHADOW
 
