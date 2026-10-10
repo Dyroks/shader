@@ -17,7 +17,7 @@ Base du pack : SEUS PTGI HRR 2.1 GFME, Iris 1.11.7, Minecraft 26.3, Voxy.
 | 7 | Forme et éclairage des cumulus (retour : trop ronds, adoucis, blancs partout) : forme en chou-fleur, surface trouvée précisément, éclairage calibré sur une référence par path tracing, 2 bugs anciens corrigés | ✅ testée en jeu (« beaucoup mieux », assombrissement brusque sous la couche moyenne corrigé ensuite) |
 | 8 | Rayons crépusculaires : nouvelle carte d'ombre des nuages en espace lumière (2 cascades, ±80 km), ombre des nuages dans l'air intégrée avec l'atmosphère physique ; 8b : brume des vallées (milieu participant éclairé et ombré par les nuages) | 🧪 8 testée (rayons trop rares et trop faibles) → 8b testée (perte de FPS) → 8c testée (FPS en partie récupérés, bruit) → 8d à tester en jeu |
 | 9 | Audit performance, lot 1 : travail inutile supprimé sans changer l'image, bugs corrigés (voir la section Phase 9) | ✅ testé en jeu (+6 à 7 FPS, aucun bug, rendu stable) ; options de comparaison retirées, code définitif |
-| 10 | Audit, lot 2 : remplacements (faisceaux proches dans l'air, cache de GI, bloom, exposition), ombres lointaines et occlusion (voir la section Phase 10) | 🚧 en cours, comparable en jeu (écran *Comparaison du lot 2*) |
+| 10 | Audit, lot 2 : remplacements (faisceaux proches dans l'air, cache de GI, bloom, exposition), ombres lointaines et occlusion (voir la section Phase 10) | 🧪 à tester en jeu, chaque partie comparable (écran *Comparaison du lot 2*) |
 
 La bibliothèque de nuages simulés (prévue en phase 7) est écartée : formes figées et répétitives (décision de l'utilisateur).
 
