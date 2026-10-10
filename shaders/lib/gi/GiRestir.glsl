@@ -5,17 +5,20 @@
 //  Every frame, at the internal resolution:
 //   1. temporal pass (GiRestirTemporal, deferred_a):
 //       - GI_RAY_COUNT new candidates per pixel: cosine weighted rays through the voxels,
-//       - merged with the reservoir of the same surface last frame (reprojected, history
-//         capped to GI_RESTIR_HISTORY candidates),
+//       - merged with the reservoir of the same surface last frame (reprojected onto the
+//         same plane, history capped to GI_RESTIR_HISTORY frames),
 //       - one pixel in four per frame re-traces its previous sample: its light is refreshed
 //         (a torch put out, the sun moving) and it is dropped when something now blocks it,
 //       - the result is kept for the next frame;
 //   2. spatial pass (GiRestirSpatial, deferred_b):
-//       - merged with the reservoirs of GI_RESTIR_SPATIAL_SAMPLES neighbours on a similar
-//         surface (Jacobian of the reconnection),
-//       - a sample taken from a neighbour must be visible from the pixel (one ray through
-//         the voxels), otherwise the pixel keeps its own reservoir,
+//       - merged with the reservoirs of GI_RESTIR_SPATIAL_SAMPLES neighbours on the same
+//         plane (Jacobian of the reconnection); the sample of a neighbour must be visible
+//         from the pixel (one ray through the voxels per neighbour that can contribute),
+//       - W normalised by the candidates that could have produced the chosen sample (no
+//         darkening where the neighbours' samples do not apply, e.g. near inner corners),
 //       - shading: radiance x cos / pi x W, plus the light of a torch holding the ray origin.
+//  The visible point of a pixel is the origin of its rays (GiRayOrigin): one candidate gives
+//  exactly the radiance it found.
 //  GI_RESTIR_REUSE: 0 = new candidates only, 1 = + temporal reuse, 2 = + spatial reuse.
 //
 //  Output giRestirOut: rgb = light reaching the surface (deferred12 scale), a = distance to
@@ -40,9 +43,9 @@ bool GiCurrentIsFirst() {
 	return (frameCounter & 1) == 0;
 }
 
-void GiStoreReservoir(bool first, ivec2 p, GiReservoir r, vec3 surfNormal, float surfDist) {
+void GiStoreReservoir(bool first, ivec2 p, GiReservoir r, vec3 surfNormal, float surfPlane) {
 	uvec4 a, b;
-	GiReservoirPack(r, surfNormal, surfDist, a, b);
+	GiReservoirPack(r, surfNormal, surfPlane, a, b);
 	if (first) {
 		imageStore(giResA0, p, a);
 		imageStore(giResB0, p, b);
@@ -52,10 +55,10 @@ void GiStoreReservoir(bool first, ivec2 p, GiReservoir r, vec3 surfNormal, float
 	}
 }
 
-GiReservoir GiLoadReservoir(bool first, ivec2 p, out vec3 surfNormal, out float surfDist) {
+GiReservoir GiLoadReservoir(bool first, ivec2 p, out vec3 surfNormal, out float surfPlane) {
 	uvec4 a = first ? imageLoad(giResA0, p) : imageLoad(giResA1, p);
 	uvec4 b = first ? imageLoad(giResB0, p) : imageLoad(giResB1, p);
-	return GiReservoirUnpack(a, b, surfNormal, surfDist);
+	return GiReservoirUnpack(a, b, surfNormal, surfPlane);
 }
 
 GiSample GiSampleFromHit(GiHit hit, vec3 origin, vec3 dir, float skyLightFix, float sunLightFix) {
@@ -71,26 +74,30 @@ GiSample GiSampleFromHit(GiHit hit, vec3 origin, vec3 dir, float skyLightFix, fl
 bool GiTraceToSample(vec3 origin, GiSample s, out GiHit hit, out vec3 dir) {
 	vec3 d = s.pos - GiRelPos(origin);
 	float len = length(d);
-	dir = d / len;
+	dir = len > 1e-4 ? d / len : vec3(0.0, 1.0, 0.0);
 	hit = GiTraceRay(origin, dir, DIFFUSE_TRACE_LENGTH);
 	if (len > giSkyDistance * 0.5) return hit.escaped;
-	return !hit.escaped && abs(hit.dist - len) < 0.5 + 0.02 * len;
+	return !hit.escaped && abs(hit.dist - len) < 0.3 + 0.01 * len;
+}
+
+// Same surface: normals within 25 degrees, and the other point on the plane of this one
+bool GiSamePlane(vec3 n, float plane, vec3 otherNormal, vec3 otherRel, float dist) {
+	return dot(n, otherNormal) > 0.9 && abs(dot(n, otherRel) - plane) < 0.02 * dist + 0.05;
 }
 
 // Reservoir of the same surface last frame, moved to the current camera; false when the
 // surface was not visible there
 bool GiLoadPrevious(GiSurface surf, out GiReservoir prev) {
+	if (frameCounter == 0) return false;   // the previous buffer holds nothing yet
 	vec3 prevRel = surf.rel + cameraPositionDiff;
 	vec4 c = gbufferPreviousProjection * (gbufferPreviousModelView * vec4(prevRel, 1.0));
-	if (c.w <= 0.0) return false;
+	if (!(c.w > 0.0)) return false;
 	ivec2 p = ivec2(floor(((c.xy / c.w) * 0.25 + 0.25) * vec2(viewWidth, viewHeight)));
 	if (any(lessThan(p, ivec2(0))) || any(greaterThanEqual(p, GiInternalSize()))) return false;
 	vec3 n;
-	float d;
-	prev = GiLoadReservoir(!GiCurrentIsFirst(), p, n, d);
-	float expected = length(prevRel);
-	if (d < 0.0 || prev.M <= 0.0 || abs(d - expected) > 0.1 * expected + 0.1 || dot(n, surf.normal) < 0.9)
-		return false;
+	float plane;
+	prev = GiLoadReservoir(!GiCurrentIsFirst(), p, n, plane);
+	if (!GiReservoirValid(prev) || !GiSamePlane(n, plane, surf.normal, prevRel, surf.dist)) return false;
 	prev.s.pos -= cameraPositionDiff;
 	return true;
 }
@@ -100,13 +107,14 @@ void GiRestirTemporal(ivec2 px) {
 	bool first = GiCurrentIsFirst();
 	GiSurface surf = GiReadSurface(px);
 	if (!surf.valid) {
-		GiStoreReservoir(first, px, GiReservoirEmpty(), vec3(0.0, 1.0, 0.0), -1.0);
+		GiStoreReservoir(first, px, GiReservoirEmpty(), vec3(0.0, 1.0, 0.0), 0.0);
 		imageStore(giRestirOut, px, vec4(0.0));
 		return;
 	}
 	float skyLightFix, sunLightFix;
 	GiLeakFixes(surf, skyLightFix, sunLightFix);
 	vec3 origin = GiRayOrigin(surf);
+	vec3 x0 = GiRelPos(origin);   // visible point
 	GiRng rng = GiRngInit(px, frameCounter, 0u);
 	vec3 noise = GiBlueNoise(px);
 
@@ -121,7 +129,7 @@ void GiRestirTemporal(ivec2 px) {
 		GiSample cand = GiSampleFromHit(hit, origin, dir, skyLightFix, sunLightFix);
 		if (k == 0) r.s = cand;
 		float sourcePdf = max(dot(surf.normal, dir), 1e-4) / giPi;
-		GiReservoirAdd(r, cand, GiTarget(surf.rel, surf.normal, cand) / sourcePdf, 1.0, GiRandom(rng));
+		GiReservoirAdd(r, cand, GiTarget(x0, surf.normal, cand) / sourcePdf, 1.0, GiRandom(rng));
 	}
 
 	#if GI_RESTIR_REUSE >= 1
@@ -135,16 +143,16 @@ void GiRestirTemporal(ivec2 px) {
 				keep = GiTraceToSample(origin, prev.s, hit, dir);
 				if (keep) prev.s.radiance = GiHitRadiance(hit, origin, dir, skyLightFix, sunLightFix);
 			}
-			float target = GiTarget(surf.rel, surf.normal, prev.s);
+			float target = GiTarget(x0, surf.normal, prev.s);
 			if (keep && target > 0.0) {
-				float M = min(prev.M, GI_RESTIR_HISTORY);
+				float M = min(prev.M, GI_RESTIR_HISTORY * float(GI_RAY_COUNT));
 				GiReservoirAdd(r, prev.s, target * prev.W * M, M, GiRandom(rng));
 			}
 		}
 	#endif
 
-	GiReservoirFinish(r, GiTarget(surf.rel, surf.normal, r.s));
-	GiStoreReservoir(first, px, r, surf.normal, surf.dist);
+	GiReservoirFinish(r, GiTarget(x0, surf.normal, r.s));
+	GiStoreReservoir(first, px, r, surf.normal, dot(surf.normal, surf.rel));
 	imageStore(giRestirOut, px, vec4(originLight, 0.0));
 }
 
@@ -153,15 +161,24 @@ void GiRestirSpatial(ivec2 px) {
 	GiSurface surf = GiReadSurface(px);
 	if (!surf.valid) return;
 	bool first = GiCurrentIsFirst();
+	vec3 origin = GiRayOrigin(surf);
+	vec3 x0 = GiRelPos(origin);
 	vec3 n;
-	float d;
-	GiReservoir own = GiLoadReservoir(first, px, n, d);
-	GiReservoir r = own;
+	float plane;
+	GiReservoir r = GiLoadReservoir(first, px, n, plane);
+	if (!GiReservoirValid(r)) r = GiReservoirEmpty();
 
 	#if GI_RESTIR_REUSE >= 2
 		GiRng rng = GiRngInit(px, frameCounter, 1u);
-		r.wSum = GiTarget(surf.rel, surf.normal, own.s) * own.W * own.M;
-		bool fromNeighbour = false;
+		r.wSum = GiTarget(x0, surf.normal, r.s) * r.W * r.M;
+		float ownM = r.M;
+		// neighbours merged: visible point, normal and M, to normalise by the ones that
+		// could have found the chosen sample
+		vec3 nbPoint[GI_RESTIR_SPATIAL_SAMPLES];
+		vec3 nbNormal[GI_RESTIR_SPATIAL_SAMPLES];
+		float nbM[GI_RESTIR_SPATIAL_SAMPLES];
+		int count = 0;
+		float surfPlane = dot(surf.normal, surf.rel);
 		float angle = GiRandom(rng) * 2.0 * giPi;
 		for (int k = 0; k < GI_RESTIR_SPATIAL_SAMPLES; k++) {
 			angle += 2.39996323;   // golden angle: neighbours spread around the pixel
@@ -169,27 +186,38 @@ void GiRestirSpatial(ivec2 px) {
 			ivec2 q = px + ivec2(round(radius * vec2(cos(angle), sin(angle))));
 			if (any(lessThan(q, ivec2(0))) || any(greaterThanEqual(q, GiInternalSize()))) continue;
 			vec3 qn;
-			float qd;
-			GiReservoir nb = GiLoadReservoir(first, q, qn, qd);
-			if (qd < 0.0 || nb.M <= 0.0 || nb.W <= 0.0) continue;
-			if (dot(qn, surf.normal) < 0.9 || abs(qd - surf.dist) > 0.1 * surf.dist) continue;
+			float qPlane;
+			GiReservoir nb = GiLoadReservoir(first, q, qn, qPlane);
+			if (!GiReservoirValid(nb)) continue;
 			GiSurface qs = GiReadSurface(q);
-			if (!qs.valid) continue;
-			float w = GiTarget(surf.rel, surf.normal, nb.s) * GiJacobian(surf.rel, qs.rel, nb.s) * nb.W * nb.M;
-			if (GiReservoirAdd(r, nb.s, w, nb.M, GiRandom(rng))) fromNeighbour = true;
+			if (!qs.valid || !GiSamePlane(surf.normal, surfPlane, qs.normal, qs.rel, surf.dist)) continue;
+			vec3 q0 = GiRelPos(GiRayOrigin(qs));
+			nbPoint[count] = q0;
+			nbNormal[count] = qs.normal;
+			nbM[count] = nb.M;
+			count++;
+			float w = GiTarget(x0, surf.normal, nb.s) * GiJacobian(x0, q0, nb.s) * nb.W * nb.M;
+			if (w > 0.0) {
+				GiHit hit;
+				vec3 dir;
+				if (!GiTraceToSample(origin, nb.s, hit, dir)) w = 0.0;   // hidden from this pixel
+			}
+			GiReservoirAdd(r, nb.s, w, nb.M, GiRandom(rng));
 		}
-		GiReservoirFinish(r, GiTarget(surf.rel, surf.normal, r.s));
-		if (fromNeighbour) {
-			GiHit hit;
-			vec3 dir;
-			if (!GiTraceToSample(GiRayOrigin(surf), r.s, hit, dir)) r = own;
+		// Z: candidates whose visible point could have produced the chosen sample
+		float Z = ownM;
+		for (int k = 0; k < count; k++) {
+			vec3 d = r.s.pos - nbPoint[k];
+			if (dot(nbNormal[k], d) > 0.0 && dot(r.s.normal, -d) > 0.0) Z += nbM[k];
 		}
+		GiReservoirFinishZ(r, GiTarget(x0, surf.normal, r.s), Z);
 	#endif
 
-	vec3 toSample = r.s.pos - surf.rel;
+	vec3 toSample = r.s.pos - x0;
 	float len = length(toSample);
 	float cosTheta = max(dot(surf.normal, toSample / max(len, 1e-6)), 0.0);
 	vec3 gi = r.s.radiance * (cosTheta / giPi) * r.W;
+	gi = all(lessThan(gi, vec3(6e4))) && all(greaterThanEqual(gi, vec3(0.0))) ? gi : vec3(0.0);   // NaN or overflow
 	vec4 outData = imageLoad(giRestirOut, px);
 	imageStore(giRestirOut, px, vec4(outData.rgb + gi, giSat(len * 0.1)));
 }

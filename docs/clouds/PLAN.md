@@ -114,8 +114,15 @@ ressembler à SEUS (luminosité, couleurs, contraste) ; le but est de faire mieu
 - Option *ReSTIR GI : réutilisation* (`GI_RESTIR_REUSE`) : 0 nouveaux échantillons seulement (équivalent d'E1),
   1 + images précédentes, 2 + voisins (défaut). Le débruiteur SEUS (accumulation temporelle et filtre à-trous) reste
   en aval jusqu'à E3.
-- Coût attendu : environ +0,5 à 1,5 ms par rapport à E1 (rayon de revalidation sur un quart des pixels, rayon de
-  visibilité quand un voisin est choisi, lectures des réservoirs). Mémoire : environ 155 Mo en 4K.
+- Relecture indépendante, corrections avant le test : le point visible est l'origine des rayons partout (un
+  candidat seul redonne exactement sa radiance, pas de surestimation sur les surfaces à parallaxe) ; test de plan
+  (même surface) pour la reprojection et les voisins au lieu de ±10 % de distance ; un rayon de visibilité par
+  voisin retenu (pas de fuite de lumière sous les surplombs ou aux entrées de grottes) ; W normalisé par les
+  candidats qui auraient pu produire l'échantillon choisi (pas d'assombrissement dans les coins) ; réservoirs
+  relus vérifiés (NaN, débordements, première image) ; historique compté en images.
+- Coût attendu : environ +1 à 3 ms par rapport à E1 (revalidation sur un quart des pixels, un rayon de visibilité
+  par voisin, lectures des réservoirs) ; *ReSTIR GI : voisins* à 1 ou 2 si c'est trop. Mémoire : environ 155 Mo
+  en 4K.
 
 ## Phase 10 : audit performance, lot 2
 

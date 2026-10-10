@@ -50,7 +50,7 @@
 #define GI_DEBUG_VIEW 0 // [0 1] 1: show only the GI light (white surfaces, no direct light)
 #define GI_RESTIR_REUSE 2 // [0 1 2] ReSTIR GI: 0 new samples only, 1 + reuse of the previous frames, 2 + reuse of the neighbouring pixels
 #define GI_RESTIR_HISTORY 20.0 // [5.0 10.0 20.0 30.0 50.0] ReSTIR GI: frames of history a pixel keeps (more: less noise, slower reaction to light changes)
-#define GI_RESTIR_SPATIAL_SAMPLES 3 // [1 2 3 4 6 8] ReSTIR GI: neighbouring pixels reused (one extra visibility ray when one is chosen)
+#define GI_RESTIR_SPATIAL_SAMPLES 3 // [1 2 3 4 6 8] ReSTIR GI: neighbouring pixels reused (one visibility ray each)
 
 // Raytracing
 #define GI_RAY_COUNT 1 // [1 2 3 4 5]

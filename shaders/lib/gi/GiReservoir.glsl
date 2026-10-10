@@ -57,8 +57,21 @@ bool GiReservoirAdd(inout GiReservoir r, GiSample s, float w, float M, float u) 
 	return false;
 }
 
+// W from the number of candidates that could have produced the chosen sample (Z: M, or
+// fewer when some merged reservoirs could not have found it)
+void GiReservoirFinishZ(inout GiReservoir r, float target, float Z) {
+	r.W = target > 0.0 && Z > 0.0 ? r.wSum / (Z * target) : 0.0;
+	if (!(r.W < 1e20)) r.W = 0.0;   // NaN or overflow
+}
+
 void GiReservoirFinish(inout GiReservoir r, float target) {
-	r.W = target > 0.0 && r.M > 0.0 ? r.wSum / (r.M * target) : 0.0;
+	GiReservoirFinishZ(r, target, r.M);
+}
+
+// Reservoir read back from storage: finite and usable
+bool GiReservoirValid(GiReservoir r) {
+	return r.M > 0.0 && r.W >= 0.0 && r.W < 1e20 && all(lessThan(abs(r.s.pos), vec3(1e5)))
+	    && all(greaterThanEqual(r.s.radiance, vec3(0.0))) && all(lessThan(r.s.radiance, vec3(6e4)));
 }
 
 // Ratio of the solid angle densities of a sample seen from xTo and from xFrom (the visible
@@ -66,8 +79,8 @@ void GiReservoirFinish(inout GiReservoir r, float target) {
 float GiJacobian(vec3 xTo, vec3 xFrom, GiSample s) {
 	vec3 dTo = xTo - s.pos;
 	vec3 dFrom = xFrom - s.pos;
-	float lTo = dot(dTo, dTo);
-	float lFrom = dot(dFrom, dFrom);
+	float lTo = max(dot(dTo, dTo), 1e-6);
+	float lFrom = max(dot(dFrom, dFrom), 1e-6);
 	float cTo = dot(s.normal, dTo) * inversesqrt(lTo);
 	float cFrom = abs(dot(s.normal, dFrom)) * inversesqrt(lFrom);
 	if (cTo <= 0.0 || cFrom < 1e-3) return 0.0;
@@ -77,14 +90,14 @@ float GiJacobian(vec3 xTo, vec3 xFrom, GiSample s) {
 
 // Storage in two rgba32ui texels:
 //  a: xyz = sample position (float bits), w = sample normal (8:8) | surface normal (8:8)
-//  b: x = radiance rg (half), y = radiance b, M (half), z = W (float bits),
-//     w = distance of the visible point (float bits, < 0: no surface)
-void GiReservoirPack(GiReservoir r, vec3 surfNormal, float surfDist, out uvec4 a, out uvec4 b) {
+//  b: x = radiance rg (half), y = radiance b, M (half; 0: no surface), z = W (float bits),
+//     w = plane of the visible point: dot(surface normal, camera relative position)
+void GiReservoirPack(GiReservoir r, vec3 surfNormal, float surfPlane, out uvec4 a, out uvec4 b) {
 	a = uvec4(floatBitsToUint(r.s.pos), GiPackNormal8(r.s.normal) | (GiPackNormal8(surfNormal) << 16u));
-	b = uvec4(packHalf2x16(r.s.radiance.rg), packHalf2x16(vec2(r.s.radiance.b, r.M)), floatBitsToUint(r.W), floatBitsToUint(surfDist));
+	b = uvec4(packHalf2x16(r.s.radiance.rg), packHalf2x16(vec2(r.s.radiance.b, r.M)), floatBitsToUint(r.W), floatBitsToUint(surfPlane));
 }
 
-GiReservoir GiReservoirUnpack(uvec4 a, uvec4 b, out vec3 surfNormal, out float surfDist) {
+GiReservoir GiReservoirUnpack(uvec4 a, uvec4 b, out vec3 surfNormal, out float surfPlane) {
 	GiReservoir r;
 	r.s.pos = uintBitsToFloat(a.xyz);
 	r.s.normal = GiUnpackNormal8(a.w & 65535u);
@@ -94,7 +107,7 @@ GiReservoir GiReservoirUnpack(uvec4 a, uvec4 b, out vec3 surfNormal, out float s
 	r.M = bm.y;
 	r.W = uintBitsToFloat(b.z);
 	r.wSum = 0.0;
-	surfDist = uintBitsToFloat(b.w);
+	surfPlane = uintBitsToFloat(b.w);
 	return r;
 }
 
