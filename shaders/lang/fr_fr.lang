@@ -389,3 +389,5 @@ screen.Lot2=Comparaison du lot 2 (temporaire)
 screen.Lot2.comment=Changements du lot 2, chacun désactivable pour comparer avant et après en jeu. Supprimé une fois validé
 option.AB_AIR_SHAFTS=Lot 2 : faisceaux proches dans l'air
 option.AB_AIR_SHAFTS.comment=Activé : faisceaux proches calculés avec la lumière de l'air (un quart des pixels) : brume fine et brume des vallées ombrées par le terrain, teinte des vitraux. Désactivé : anciens godrays (32 pas par pixel, ajoutés par-dessus)
+option.AB_GI_CACHE=Lot 2 : cache de lumière de la GI
+option.AB_GI_CACHE.comment=Activé : le cache de lumière de la GI (second rebond, 202³ cellules en 4K) retrace la moitié de ses cellules par image avec un poids double (même temps de réponse, un peu plus de bruit). Désactivé : toutes les cellules à chaque image

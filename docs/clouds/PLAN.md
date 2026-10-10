@@ -64,6 +64,7 @@ temporaire `AB_*` (écran *Comparaison du lot 2*), activée par défaut.
 | Partie | Option | Contenu | État |
 |---|---|---|---|
 | 2-A | `AB_AIR_SHAFTS` | R1 : faisceaux proches calculés avec la lumière de l'air | à tester |
+| 2-B | `AB_GI_CACHE` | R2 : cache de lumière de la GI retracé par moitié | à tester |
 
 **2-A, faisceaux proches dans l'air** (`AirTerrainShadow.inc`, `Crepuscular.inc`, `composite4_c.csh`) :
 - Les anciens godrays (`composite4.fsh`) faisaient 32 pas sur 100 blocs pour chaque pixel interne, ciel compris,
@@ -79,6 +80,13 @@ temporaire `AB_*` (écran *Comparaison du lot 2*), activée par défaut.
   +50 % près du soleil. Les faisceaux naissent du contraste avec les zones à l'ombre du terrain.
 - Le segment lointain démarre après le segment proche : le terrain proche (moins de 240 blocs) n'a plus que les
   8 pas proches au lieu de 12 à 24.
+
+**2-B, cache de lumière de la GI** (`deferred2.fsh`, gain estimé 0,5 à 1 ms) : chaque pixel de `colortex5` porte une
+cellule du cache (202³ en 4K) en plus des données temporelles du pixel, d'où une taille liée à la résolution.
+Réduire la taille (±80 blocs au lieu de ±101) raccourcirait le second rebond alors que le volume de GI fait ±167
+blocs : écarté. Une moitié des cellules est retracée par image, par bandes de 8 lignes (warps entiers actifs ou
+inactifs), avec un poids double (0,05 au lieu de 0,025 : même temps de réponse) ; l'autre moitié suit seulement
+la caméra (copie décalée).
 
 ## Phase 9 : audit performance, lot 1
 

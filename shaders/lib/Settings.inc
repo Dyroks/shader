@@ -87,6 +87,7 @@
 
 // Lot 2 A/B (temporary: compare in game, then removed)
 #define AB_AIR_SHAFTS // Near light shafts from the air light (terrain shadow, near mist) instead of the old godrays
+#define AB_GI_CACHE // GI light cache: half of the cells traced per frame
 
 // Others
 // #define VISUALIZE_DANGEROUS_LIGHT_LEVEL

@@ -428,7 +428,16 @@ const float RAY_TRACING_RADIUS = RAY_TRACING_DIAMETER / 2.0;
        v=F;
      }
    vec3 irCachePos=b();
+   #ifdef AB_GI_CACHE
+   // Light cache: half of the cells traced per frame, in bands of 8 cache rows (8 screen rows: whole
+   // warps active or idle), with twice the blend weight (same response time). The other half only
+   // follows the camera (scrolled copy).
+   v.jbwXZaPXmq=D(irCachePos);
+   if((((int(irCachePos.z)>>3)+frameCounter)&1)==0)
+     v.jbwXZaPXmq=mix(v.jbwXZaPXmq,c(irCachePos),vec3(.05));
+   #else
    v.jbwXZaPXmq=mix(D(irCachePos),c(irCachePos),vec3(.025));
+   #endif
    v.KZGLOOTLva=c(texcoord.xy).KZGLOOTLva;
    gl_FragData[0]=vec4(y);
    gl_FragData[1]=max(vec4(0.),p(v));
