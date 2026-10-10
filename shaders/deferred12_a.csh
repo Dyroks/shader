@@ -125,11 +125,15 @@ void main() {
 				if (!ProjectToPixel(q, qp)) break;
 				vec4 o = SceneViewPos(qp);
 				if (o.w == 0.0 || (o.w == 1.0 && !countVanilla)) continue;
-				float behind = o.z - q.z;   // > 0: q is behind the visible surface
-				if (behind > 0.002 * -q.z + 0.5 && behind < s + 32.0) {
-					sun = 0.0;
-					break;
-				}
+				// q is behind the visible surface, and that surface lies at a comparable depth (a ridge
+				// between the point and the sun): a much closer object (wall, entity) only hides q on
+				// screen and says nothing about the light reaching it
+				float qd = -q.z, od = -o.z;
+				float behind = od < qd ? qd - od : 0.0;
+				float eps = 0.002 * qd + 0.5;
+				float occ = smoothstep(eps, 4.0 * eps, behind) * smoothstep(0.7, 0.8, od / qd) * step(behind, s + 32.0);
+				sun = min(sun, 1.0 - occ);
+				if (sun < 0.01) break;
 			}
 		}
 

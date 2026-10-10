@@ -64,10 +64,10 @@ temporaire `AB_*` (écran *Comparaison du lot 2*), activée par défaut.
 | Partie | Option | Contenu | État |
 |---|---|---|---|
 | 2-A | `AB_AIR_SHAFTS` | R1 : faisceaux proches calculés avec la lumière de l'air | à tester |
-| 2-B | `AB_GI_CACHE` | R2 : cache de lumière de la GI retracé par moitié | à tester |
+| 2-B | `AB_GI_CACHE` | R2 : cache de lumière de la GI retracé par moitié | ❌ désactivé par défaut (taches lumineuses en intérieur) |
 | 2-C | `AB_BLOOM` | R3 : bloom progressif ; R4 écarté | à tester |
 | 2-D | `AB_FAR_SHADING` | S7, V6, V7 : ombres et occlusion du relief lointain | à tester |
-| 2-E | `AB_GI_FIREFLY` | Anti-lucioles de la GI (retour du test : points lumineux qui clignotent en intérieur) | à tester |
+| 2-E | (retiré) | Anti-lucioles de la GI | ❌ retiré (pièces trop sombres, traînées) |
 
 **2-A, faisceaux proches dans l'air** (`AirTerrainShadow.inc`, `Crepuscular.inc`, `composite4_c.csh`) :
 - Les anciens godrays (`composite4.fsh`) faisaient 32 pas sur 100 blocs pour chaque pixel interne, ciel compris,
@@ -123,6 +123,21 @@ retracé par moitié (2-B, poids double : mise à jour environ 1,4 fois plus bru
 l'historique est valide) comme pour le cache, ne peut pas dépasser `GI_FIREFLY_LIMIT` (6 par défaut) fois la
 luminance accumulée + 0,01. Seules les valeurs aberrantes sont biaisées ; une lumière qui apparaît met un peu plus
 longtemps à atteindre sa valeur (environ 1 s).
+
+**Retour du test de 2-E** : points atténués, mais pièce bien plus sombre que dans SEUS d'origine quand un faisceau
+de soleil tape un sol clair, traînées en tournant la caméra dans une pièce sombre, et toujours quelques grandes
+taches isolées. Analyse :
+- Une pièce éclairée par une petite tache de soleil reçoit sa lumière par de rares rayons très lumineux : leur
+  moyenne *est* la lumière de la pièce. Toute limite relative à l'historique la coupe (pièce sombre) et ralentit
+  la convergence (traînées). L'anti-lucioles est retiré.
+- Les grandes taches isolées viennent probablement du cache retracé par moitié : une cellule (un bloc) qui voit par
+  hasard la tache de soleil ou une torche prend d'un coup 2 fois plus de valeur, et tous les rayons de GI qui la
+  touchent s'éclairent. À qualité égale, il faudrait 2 rayons par mise à jour : aucun gain. 2-B est désactivé par
+  défaut (cache mis à jour à chaque image, comme à l'origine).
+- Ombres lointaines (2-D) qui changent de forme et bruitées : la marche vers le soleil acceptait comme obstacle un
+  objet bien plus proche que le point testé (le mur devant la caméra, le parapente). Un obstacle doit maintenant
+  être à au moins 70-80 % de la profondeur du point testé (une crête entre la vallée et le soleil) ; occlusion
+  progressive au lieu de binaire.
 
 ## Phase 9 : audit performance, lot 1
 
