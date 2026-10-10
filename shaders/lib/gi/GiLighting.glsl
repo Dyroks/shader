@@ -85,8 +85,8 @@ vec3 GiCacheIrradiance(ivec3 voxel, vec3 normal) {
 	vec3 cell = floor(clamp(p, vec3(0.0), vec3(size - 1.0)).xzy + 1e-5);
 	float run = cell.x + cell.z * size;
 	ivec2 texel = ivec2(mod(run, viewWidth), cell.y + floor(run / viewWidth) * size);
-	vec4 packed = texelFetch(colortex5, texel, 0);
-	vec3 irradiance = vec3(UnpackTwo16BitFrom32Bit(packed.y).x, UnpackTwo16BitFrom32Bit(packed.z).x, UnpackTwo16BitFrom32Bit(packed.w).x);
+	vec4 data = texelFetch(colortex5, texel, 0);
+	vec3 irradiance = vec3(UnpackTwo16BitFrom32Bit(data.y).x, UnpackTwo16BitFrom32Bit(data.z).x, UnpackTwo16BitFrom32Bit(data.w).x);
 	return pow(irradiance, vec3(8.0));
 }
 

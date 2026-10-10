@@ -101,6 +101,12 @@ def iris_lint():
     """Checks for things glslang accepts but Iris rejects. Returns the number of problems."""
     problems = 0
     inc = re.compile(r'^\s*#include\s+"[^"]*"\s*\S')
+    # keywords and reserved words of later GLSL versions: the NVIDIA driver rejects them as names
+    # even in a 3.30 shader, glslang does not
+    reserved = re.compile(r'\b[A-Za-z_]\w*\s+(packed|shared|sample|buffer|patch|input|output|filter|common|partition|active'
+                          r'|half|fixed|unsigned|long|short|class|union|enum|typedef|template|this|resource|goto|inline'
+                          r'|noinline|public|static|extern|external|interface|superp|namespace|using|cast|sizeof|precise'
+                          r'|subroutine)\s*[=;,)\[]')
     for root, _, files in os.walk(SHADERS):
         for name in files:
             if not name.endswith((".fsh", ".vsh", ".gsh", ".csh", ".glsl", ".inc")):
@@ -109,6 +115,10 @@ def iris_lint():
             for i, line in enumerate(open(path, encoding="utf-8", errors="replace"), 1):
                 if inc.match(line):  # Iris reads the rest of the line as part of the path
                     print(f"IRIS: {os.path.relpath(path, SHADERS)}:{i}: text after #include: {line.strip()}")
+                    problems += 1
+                m = reserved.search(line.split("//")[0])
+                if m:
+                    print(f"DRIVER: {os.path.relpath(path, SHADERS)}:{i}: reserved word used as a name: {m.group(1)}")
                     problems += 1
     return problems
 
