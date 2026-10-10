@@ -90,7 +90,9 @@ AirLight AirLightIntegrate(vec3 dir, float dist, vec2 cloudTD, vec3 noise, vec3 
 		// aerosols: forward peak and some back scattering (two lobe Henyey-Greenstein)
 		float phaseH = mix(AtmoPhaseHG(c, 0.78), AtmoPhaseHG(c, -0.3), 0.15);
 		float hazeSig = hazeSigma * apFade * (1.0 + 2.0 * wetness);
-		float hazeBase = (float(HAZE_ALTITUDE) - atmoGroundY) * atmoKmPerBlock;   // above the planet's ground
+		// radius of the haze altitude, relative to the camera: the atmosphere clamps the camera
+		// to its ground (Y = 63), the haze follows the true altitudes (negative ones included)
+		float hazeBase = ro.y + (float(HAZE_ALTITUDE) - camY) * atmoKmPerBlock;
 		float muL = max(L.y, 0.0) + 0.012;   // the horizontal path through the layer is finite
 		// ground lit by the sun below the haze (isotropic, half the sphere)
 		float groundSun = 0.5 * hazeGroundAlbedo / atmoPI * max(L.y, 0.0);
@@ -108,7 +110,7 @@ AirLight AirLightIntegrate(vec3 dir, float dist, vec2 cloudTD, vec3 noise, vec3 
 		vec3 Pm = ro + dir * (0.5 * t0 * atmoKmPerBlock);
 		Ta = exp(-AtmoSampleMedium(length(Pm) - atmoRg, mieScale).ext * (apScale * t0 * atmoKmPerBlock));
 		#ifdef HAZE_ACTIVE
-			Th = exp(-hazeSig * hazeSpectral * (exp(-max(length(Pm) - atmoRg - hazeBase, 0.0) / hazeH) * t0 * atmoKmPerBlock));
+			Th = exp(-hazeSig * hazeSpectral * (exp(-max(length(Pm) - hazeBase, 0.0) / hazeH) * t0 * atmoKmPerBlock));
 		#endif
 	}
 	if (t0 >= cloudTD.y) Thcloud = Th;
@@ -128,7 +130,7 @@ AirLight AirLightIntegrate(vec3 dir, float dist, vec2 cloudTD, vec3 noise, vec3 
 		vec3 sampleTa = exp(-extA * dtKm);
 		vec3 wa = Ta * (1.0 - sampleTa) / max(extA, vec3(1e-7));   // integral of Ta over the step
 		#ifdef HAZE_ACTIVE
-			float hRel = r - atmoRg - hazeBase;
+			float hRel = r - hazeBase;
 			vec3 hazeExt = hazeSig * hazeSpectral * exp(-max(hRel, 0.0) / hazeH);
 			vec3 ext = extA + hazeExt;
 			vec3 sampleTh = exp(-hazeExt * dtKm);

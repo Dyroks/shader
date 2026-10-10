@@ -95,6 +95,9 @@ brume dense limite la profondeur visible à quelques km : le motif des ombres re
 | **Perspective atmosphérique** | L'air retiré sur le relief suit le même facteur que `LandAtmosphericScattering` (*Perspective atmosphérique* × lumière du ciel à l'œil) : la soustraction était incohérente avec un réglage ≠ 1. |
 | **Coût** (hors jeu) | Brume ≈ +10 % du coût des rayons (1 lecture de table de diffusion multiple et quelques exponentielles par pas). Brume seule (rayons désactivés) : moins cher que les rayons. |
 
+*Altitude de la brume* va de −2000 à 2000 (cartes qui descendent sous Y = 0) ; elle est calculée par rapport à la
+vraie altitude de la caméra (l'atmosphère, elle, ramène la caméra à son sol, Y = 63).
+
 Réglages conseillés pour une carte de montagne : *Altitude de la brume* = fond des vallées, *Brume des vallées*
 Marquée ou Dense, *Épaisseur* 800 à 1000 m (elle monte sur les versants), *Intensité des rayons* 150 à 300 %.
 
