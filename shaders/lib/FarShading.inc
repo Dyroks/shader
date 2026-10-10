@@ -15,9 +15,14 @@ const float farShadowSoftness = 12.0; // larger = harder shadow edges (penumbra 
 // World height map of the terrain seen by the camera (deferred12_a clears, deferred12_b fills,
 // deferred12_c marches it): farHeightSize^2 cells of farHeightCell blocks, toroidal, anchored in
 // the world around the camera; a cell holds the highest surface seen in it (0 = unknown).
+// Shader storage buffer 1 (FAR_HEIGHT_BUFFER, compute programs only).
 const float farHeightCell = 8.0;
 const int farHeightSize = 2048;
 const int farHeightMagic = 0x5EED;
+
+int FarHeightIndex(ivec2 t) {
+	return t.y * farHeightSize + t.x;
+}
 
 ivec2 FarHeightOrigin(vec3 cam) {
 	return ivec2(floor(cam.xz / farHeightCell)) - farHeightSize / 2;
@@ -28,6 +33,13 @@ uint FarHeightEncode(float y) {
 float FarHeightDecode(uint v) {
 	return float(v) / 16.0 - 4096.0;
 }
+#ifdef FAR_HEIGHT_BUFFER
+layout(std430, binding = 1) buffer FarHeightBuffer {
+	ivec4 farHeightState;   // xy: window origin of the last frame, z: magic once initialised
+	uint farHeight[];       // farHeightSize^2 cells (texel t at t.y * farHeightSize + t.x)
+};
+#endif
+
 const int farAOSamples = 8;
 const float farAOStrength = 0.8;
 

@@ -120,6 +120,13 @@ def iris_lint():
                 if m:
                     print(f"DRIVER: {os.path.relpath(path, SHADERS)}:{i}: reserved word used as a name: {m.group(1)}")
                     problems += 1
+    # Iris keeps only the first 16 custom images (ShaderProperties: "Only up to 16 images are
+    # allowed"): the others are dropped with a log line, and their writes land in other images
+    props = os.path.join(SHADERS, "shaders.properties")
+    images = list(dict.fromkeys(l.split("=")[0].strip() for l in open(props, encoding="utf-8") if re.match(r"\s*image\.\w+\s*=", l)))
+    if len(images) > 16:
+        print(f"IRIS: {len(images)} custom images declared, Iris keeps only the first 16: {', '.join(images[16:])} dropped")
+        problems += 1
     return problems
 
 

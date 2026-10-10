@@ -21,8 +21,10 @@
 //  exactly the radiance it found.
 //  GI_RESTIR_REUSE: 0 = new candidates only, 1 = + temporal reuse, 2 = + spatial reuse.
 //
-//  Output giRestirOut: rgb = light reaching the surface (deferred12 scale), a = distance to
-//  the sample / 10. Reservoirs: two pairs of rgba32ui images, swapped every frame.
+//  Output: the GI area of colortex7 (colorimg7, upper left quarter of the screen buffers, the
+//  place deferred.fsh used to write it): rgb = light reaching the surface (deferred12 scale),
+//  a = distance to the sample / 10. Reservoirs: shader storage buffer 0, two per pixel,
+//  swapped every frame (Iris keeps only 16 custom images: storage buffers do not count).
 //
 //  Needs GiComputeHeader.glsl.
 // =====================================================================================
@@ -30,11 +32,15 @@
 #ifndef GI_RESTIR_INC
 #define GI_RESTIR_INC
 
-layout(rgba32ui) uniform uimage2D giResA0;
-layout(rgba32ui) uniform uimage2D giResB0;
-layout(rgba32ui) uniform uimage2D giResA1;
-layout(rgba32ui) uniform uimage2D giResB1;
-layout(rgba16f) uniform image2D giRestirOut;
+struct GiPixelData {
+	uvec4 a0, b0;    // reservoir written on even frames
+	uvec4 a1, b1;    // reservoir written on odd frames
+	vec4 originLight;   // light of a torch holding the ray origin (temporal pass -> spatial pass)
+};
+layout(std430, binding = 0) buffer GiRestirBuffer {
+	GiPixelData giPixels[];   // internal resolution, row by row
+};
+layout(rgba16f) uniform writeonly image2D colorimg7;
 
 const float giRestirSpatialRadius = 24.0;   // pixels (internal resolution)
 
@@ -43,22 +49,33 @@ bool GiCurrentIsFirst() {
 	return (frameCounter & 1) == 0;
 }
 
+int GiPixelIndex(ivec2 p) {
+	return p.y * GiInternalSize().x + p.x;
+}
+
 void GiStoreReservoir(bool first, ivec2 p, GiReservoir r, vec3 surfNormal, float surfPlane) {
 	uvec4 a, b;
 	GiReservoirPack(r, surfNormal, surfPlane, a, b);
+	int i = GiPixelIndex(p);
 	if (first) {
-		imageStore(giResA0, p, a);
-		imageStore(giResB0, p, b);
+		giPixels[i].a0 = a;
+		giPixels[i].b0 = b;
 	} else {
-		imageStore(giResA1, p, a);
-		imageStore(giResB1, p, b);
+		giPixels[i].a1 = a;
+		giPixels[i].b1 = b;
 	}
 }
 
 GiReservoir GiLoadReservoir(bool first, ivec2 p, out vec3 surfNormal, out float surfPlane) {
-	uvec4 a = first ? imageLoad(giResA0, p) : imageLoad(giResA1, p);
-	uvec4 b = first ? imageLoad(giResB0, p) : imageLoad(giResB1, p);
+	int i = GiPixelIndex(p);
+	uvec4 a = first ? giPixels[i].a0 : giPixels[i].a1;
+	uvec4 b = first ? giPixels[i].b0 : giPixels[i].b1;
 	return GiReservoirUnpack(a, b, surfNormal, surfPlane);
+}
+
+// Result into the GI area of colortex7 (same pixel mapping as deferred.fsh: one row up)
+void GiStoreResult(ivec2 p, vec4 v) {
+	imageStore(colorimg7, ivec2(p.x, p.y + int(floor(viewHeight * 0.5)) + 1), v);
 }
 
 GiSample GiSampleFromHit(GiHit hit, vec3 origin, vec3 dir, float skyLightFix, float sunLightFix) {
@@ -108,7 +125,6 @@ void GiRestirTemporal(ivec2 px) {
 	GiSurface surf = GiReadSurface(px);
 	if (!surf.valid) {
 		GiStoreReservoir(first, px, GiReservoirEmpty(), vec3(0.0, 1.0, 0.0), 0.0);
-		imageStore(giRestirOut, px, vec4(0.0));
 		return;
 	}
 	float skyLightFix, sunLightFix;
@@ -153,7 +169,7 @@ void GiRestirTemporal(ivec2 px) {
 
 	GiReservoirFinish(r, GiTarget(x0, surf.normal, r.s));
 	GiStoreReservoir(first, px, r, surf.normal, dot(surf.normal, surf.rel));
-	imageStore(giRestirOut, px, vec4(originLight, 0.0));
+	giPixels[GiPixelIndex(px)].originLight = vec4(originLight, 0.0);
 }
 
 void GiRestirSpatial(ivec2 px) {
@@ -218,8 +234,7 @@ void GiRestirSpatial(ivec2 px) {
 	float cosTheta = max(dot(surf.normal, toSample / max(len, 1e-6)), 0.0);
 	vec3 gi = r.s.radiance * (cosTheta / giPi) * r.W;
 	gi = all(lessThan(gi, vec3(6e4))) && all(greaterThanEqual(gi, vec3(0.0))) ? gi : vec3(0.0);   // NaN or overflow
-	vec4 outData = imageLoad(giRestirOut, px);
-	imageStore(giRestirOut, px, vec4(outData.rgb + gi, giSat(len * 0.1)));
+	GiStoreResult(px, vec4(giPixels[GiPixelIndex(px)].originLight.rgb + gi, giSat(len * 0.1)));
 }
 
 #endif

@@ -409,9 +409,6 @@ const float RAY_TRACING_RADIUS = RAY_TRACING_DIAMETER / 2.0;
    Y.w=saturate(Y.w*.1);
    return Y;
  }
-#else
-// ReSTIR GI: computed by deferred_a.csh and deferred_b.csh (lib/gi/GiRestir.glsl)
-uniform sampler2D giRestirOutSampler;
 #endif
  void main()
  {
@@ -451,7 +448,9 @@ uniform sampler2D giRestirOutSampler;
        #if GI_METHOD == 0
        i=c(f.xyz,s.xyz,z,e,r,x,m.mcLightmap.y,m.parallaxOffset);
        #else
-       i=x.sky>.5?vec4(0.):texelFetch(giRestirOutSampler,min(ivec2(Texcoord*ScreenSize),ivec2(ceil(ScreenSize*.5))-1),0);
+       // ReSTIR GI: already written here by deferred_b.csh (lib/gi/GiRestir.glsl)
+       if(x.sky>.5)
+         i=vec4(0.);
        #endif
      }
    gl_FragData[0]=texture2DLod(colortex1,texcoord.xy,0);

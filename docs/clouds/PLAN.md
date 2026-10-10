@@ -109,8 +109,8 @@ ressembler à SEUS (luminosité, couleurs, contraste) ; le but est de faire mieu
   semblable, poids × jacobien de la reconnexion ; un échantillon pris à un voisin doit être visible depuis le pixel
   (un rayon dans les voxels), sinon le pixel garde son propre réservoir. Ombrage : radiance × cos / π × W.
 - Fonction cible : luminance de la lumière de l'échantillon × cosinus. Ciel : échantillon placé à 10 000 blocs
-  dans la direction du rayon. Réservoirs : deux paires d'images `rgba32ui` (position, normales 8:8, radiance en
-  demi-flottants, M, W, distance de la surface), échangées à chaque image.
+  dans la direction du rayon. Réservoirs : deux par pixel dans un storage buffer (position, normales 8:8, radiance en
+  demi-flottants, M, W, plan de la surface), échangés à chaque image.
 - Option *ReSTIR GI : réutilisation* (`GI_RESTIR_REUSE`) : 0 nouveaux échantillons seulement (équivalent d'E1),
   1 + images précédentes, 2 + voisins (défaut). Le débruiteur SEUS (accumulation temporelle et filtre à-trous) reste
   en aval jusqu'à E3.
@@ -120,6 +120,18 @@ ressembler à SEUS (luminosité, couleurs, contraste) ; le but est de faire mieu
   voisin retenu (pas de fuite de lumière sous les surplombs ou aux entrées de grottes) ; W normalisé par les
   candidats qui auraient pu produire l'échantillon choisi (pas d'assombrissement dans les coins) ; réservoirs
   relus vérifiés (NaN, débordements, première image) ; historique compté en images.
+- **Retour du premier test d'E2** : nuages qui clignotent à chaque image avec un contour étrange, grand rectangle
+  blanc en bas à gauche de l'écran, intérieur beaucoup trop lumineux et laiteux (déjà présent avant ReSTIR).
+  Cause unique, trouvée dans le code source d'Iris : **Iris ne garde que les 16 premières images personnalisées**
+  (`image.*`), les suivantes sont ignorées avec une simple ligne dans le journal et leurs écritures tombent dans
+  d'autres images. Le commit des ombres lointaines par carte de hauteur (24cf320) avait porté le pack à 18 images :
+  `farHeightState` et `bloomAccum` ignorées, d'où le bloom faux qui voilait l'image (intérieur laiteux) et
+  sans doute une partie de l'instabilité des ombres lointaines. E2 portait le total à 23 (historique B des
+  nuages, lumière de l'air, ombrage lointain et bloom ignorés). Corrections : réservoirs de ReSTIR GI dans un
+  *shader storage buffer* (`bufferObject.0`, 80 octets par pixel, non compté dans la limite), résultat écrit
+  directement dans la zone de GI de `colortex7` (`colorimg7`, plus d'image de sortie), carte de hauteur des ombres
+  lointaines et son état dans `bufferObject.1`. Le pack déclare 16 images (limite atteinte : les prochains modules
+  utiliseront des storage buffers). `tools/compile_check.py` signale désormais tout dépassement.
 - Coût attendu : environ +1 à 3 ms par rapport à E1 (revalidation sur un quart des pixels, un rayon de visibilité
   par voisin, lectures des réservoirs) ; *ReSTIR GI : voisins* à 1 ou 2 si c'est trop. Mémoire : environ 155 Mo
   en 4K.

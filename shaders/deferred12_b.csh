@@ -12,16 +12,15 @@ const ivec3 workGroups = ivec3(1, 1, 1);
 #endif
 
 #ifdef AB_FAR_SHADING
+#define FAR_HEIGHT_BUFFER
 #include "/lib/FarShading.inc"
 #include "/lib/FarShadingCompute.inc"
-layout(r32ui) uniform uimage2D farHeight;
-layout(rgba32i) uniform writeonly iimage2D farHeightState;
 #endif
 
 void main() {
 	#ifdef AB_FAR_SHADING
 		ivec2 org = FarHeightOrigin(cameraPosition);
-		if (gl_GlobalInvocationID.xy == uvec2(0u)) imageStore(farHeightState, ivec2(0), ivec4(org, farHeightMagic, 0));
+		if (gl_GlobalInvocationID.xy == uvec2(0u)) farHeightState = ivec4(org, farHeightMagic, 0);
 		ivec2 px = FarShadeSetup(ivec2(gl_GlobalInvocationID.xy));
 		if (px.x < 0) return;
 		vec4 P = SceneViewPos(px);
@@ -31,6 +30,6 @@ void main() {
 		vec3 world = mat3(gbufferModelViewInverse) * P.xyz + gbufferModelViewInverse[3].xyz + cameraPosition;
 		ivec2 cell = ivec2(floor(world.xz / farHeightCell));
 		if (any(lessThan(cell, org)) || any(greaterThanEqual(cell, org + farHeightSize))) return;
-		imageAtomicMax(farHeight, cell & (farHeightSize - 1), FarHeightEncode(world.y));
+		atomicMax(farHeight[FarHeightIndex(cell & (farHeightSize - 1))], FarHeightEncode(world.y));
 	#endif
 }

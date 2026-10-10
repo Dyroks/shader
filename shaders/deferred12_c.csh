@@ -17,9 +17,9 @@ const ivec3 workGroups = ivec3(1, 1, 1);
 #endif
 
 #ifdef AB_FAR_SHADING
+#define FAR_HEIGHT_BUFFER
 #include "/lib/FarShading.inc"
 #include "/lib/FarShadingCompute.inc"
-uniform usampler2D farHeightSampler;
 layout(rgba16f) uniform writeonly image2D farShade;
 
 const float shadowDistance = 240.0; // Shadow distance. Set lower if you prefer nicer close shadows. Set higher if you prefer nicer distant shadows. [80.0 120.0 160.0 200.0 240.0 280.0 320.0 360.0 400.0 440.0 480.0 520.0 560.0 600.0 640.0]
@@ -74,10 +74,10 @@ void main() {
 				ivec2 c0 = ivec2(floor(c));
 				if (any(lessThan(c0, org)) || any(greaterThanEqual(c0 + 1, org + farHeightSize))) break;
 				vec2 fr = c - vec2(c0);
-				uvec4 hv = uvec4(texelFetch(farHeightSampler, c0 & (farHeightSize - 1), 0).r,
-				                 texelFetch(farHeightSampler, (c0 + ivec2(1, 0)) & (farHeightSize - 1), 0).r,
-				                 texelFetch(farHeightSampler, (c0 + ivec2(0, 1)) & (farHeightSize - 1), 0).r,
-				                 texelFetch(farHeightSampler, (c0 + ivec2(1, 1)) & (farHeightSize - 1), 0).r);
+				uvec4 hv = uvec4(farHeight[FarHeightIndex(c0 & (farHeightSize - 1))],
+				                 farHeight[FarHeightIndex((c0 + ivec2(1, 0)) & (farHeightSize - 1))],
+				                 farHeight[FarHeightIndex((c0 + ivec2(0, 1)) & (farHeightSize - 1))],
+				                 farHeight[FarHeightIndex((c0 + ivec2(1, 1)) & (farHeightSize - 1))]);
 				uint known = max(max(hv.x, hv.y), max(hv.z, hv.w));
 				if (known == 0u) continue;
 				for (int j = 0; j < 4; j++) if (hv[j] == 0u) hv[j] = known;

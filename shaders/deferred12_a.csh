@@ -11,19 +11,18 @@ const ivec3 workGroups = ivec3(1, 1, 1);
 #endif
 
 #ifdef AB_FAR_SHADING
+#define FAR_HEIGHT_BUFFER
 #include "/lib/FarShading.inc"
 uniform vec3 cameraPosition;
-layout(r32ui) uniform writeonly uimage2D farHeight;
-layout(rgba32i) uniform readonly iimage2D farHeightState;
 #endif
 
 void main() {
 	#ifdef AB_FAR_SHADING
 		ivec2 t = ivec2(gl_GlobalInvocationID.xy);
 		ivec2 org = FarHeightOrigin(cameraPosition);
-		ivec4 state = imageLoad(farHeightState, ivec2(0));   // xy: last window origin, z: magic
+		ivec4 state = farHeightState;   // xy: last window origin, z: magic
 		ivec2 w = org + ((t - org) & (farHeightSize - 1));   // world cell this texel holds now
 		bool keep = state.z == farHeightMagic && all(greaterThanEqual(w, state.xy)) && all(lessThan(w, state.xy + farHeightSize));
-		if (!keep) imageStore(farHeight, t, uvec4(0u));
+		if (!keep) farHeight[FarHeightIndex(t)] = 0u;
 	#endif
 }
