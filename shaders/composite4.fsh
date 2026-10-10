@@ -30,8 +30,7 @@ flat in vec3 colorSkyUp;
 flat in vec3 cloudSkyAmbient;
 #include "/lib/clouds/CloudLookups.inc"
 #include "/lib/clouds/CloudComposite.inc"
-#if defined CREPUSCULAR_RAYS && defined CLOUD_SHADOWS && ATMOSPHERE_MODEL == 1
-#define CREPUSCULAR_ACTIVE
+#if ATMOSPHERE_MODEL == 1
 #include "/lib/atmosphere/Crepuscular.inc"
 #endif
 #endif
@@ -212,10 +211,11 @@ vec3 WorldPosToShadowProjPos(vec3 worldPos)
      {
        vec2 cloudTD;
        CloudComposite(U,c.xyz,texcoord.xy,cloudSkyAmbient,cloudTD);
-       #ifdef CREPUSCULAR_ACTIVE
-       // crepuscular rays: remove the light the air in the shadow of the clouds does not scatter
-       vec3 crep=CrepuscularShadowedLight(c.xyz,CloudSurfaceDistance(texcoord.xy),cloudTD,BlueNoiseTemporal(texcoord.xy))*cloudToComposite;
-       U=CrepuscularApply(U,crep);
+       #ifdef AIR_LIGHT_ACTIVE
+       // crepuscular rays (the light the air in the shadow of the clouds does not scatter) and
+       // the haze layer
+       AirLight air=AirLightIntegrate(c.xyz,CloudSurfaceDistance(texcoord.xy),cloudTD,BlueNoiseTemporal(texcoord.xy),cloudSkyAmbient,pow(saturate(eyeBrightnessSmooth.y/240.),6.));
+       U=AirLightApply(U,air,cloudToComposite);
        #endif
      }
    #endif

@@ -35,7 +35,7 @@ option.ATMOSPHERE_MODEL=Atmosphere
 option.ATMOSPHERE_MODEL.comment=SEUS: the original sky. Physical: Hillaire 2020 precomputed scattering (Rayleigh, aerosols, ozone, multiple scattering), consistent with the sunlight, correct seen from any altitude, with a physical haze over distant terrain and clouds.
 value.ATMOSPHERE_MODEL.0=SEUS
 value.ATMOSPHERE_MODEL.1=Physical
-option.ATMOSPHERE_HAZE=Haze
+option.ATMOSPHERE_HAZE=Haze (Atmosphere)
 option.ATMOSPHERE_HAZE.comment=Physical atmosphere: amount of aerosols in the lowest kilometres (visibility). Rain adds more.
 value.ATMOSPHERE_HAZE.0=Very Clean Air
 value.ATMOSPHERE_HAZE.1=Clean Air
@@ -367,8 +367,21 @@ option.WEATHER.comment=Rendering rain and snow. Experimental and buggy
 option.CREPUSCULAR_RAYS=Crepuscular Rays
 option.CREPUSCULAR_RAYS.comment=Shadows of the clouds in the air: shafts of light between clouds, sunset rays fanning out over the sky, anticrepuscular rays converging opposite the sun. Needs the physical atmosphere and cloud shadows.
 option.CREPUSCULAR_STRENGTH=Rays Strength
-option.CREPUSCULAR_STRENGTH.comment=100 % = physical (the rays also depend on the haze). Higher = darker shadow shafts, more spectacular, never darker than air without direct light.
+option.CREPUSCULAR_STRENGTH.comment=100 % = physical (the rays mostly depend on the valley haze). Higher = darker shadow shafts below the low clouds, more spectacular, never darker than air without direct light.
 option.CREPUSCULAR_STEPS=Rays Quality
 option.CREPUSCULAR_STEPS.comment=Samples along each view ray. More = less noise in motion, slower.
 option.CREPUSCULAR_DISTANCE=Rays Distance
 option.CREPUSCULAR_DISTANCE.comment=Maximum distance of the rays in km (scaled). Sunset rays need long distances.
+option.HAZE_DENSITY=Valley Haze
+option.HAZE_DENSITY.comment=Physical atmosphere: dense haze layer near the ground that pools in valleys, lit by the sun and shadowed by the clouds: this is what makes the light shafts visible. Visibility at its densest. Rain adds more.
+value.HAZE_DENSITY.0=Off
+value.HAZE_DENSITY.1=Very Light (190 km)
+value.HAZE_DENSITY.2=Light (100 km)
+value.HAZE_DENSITY.3=Normal (50 km)
+value.HAZE_DENSITY.4=Marked (25 km)
+value.HAZE_DENSITY.5=Dense (12 km)
+value.HAZE_DENSITY.6=Very Dense (6 km)
+option.HAZE_ALTITUDE=Valley Haze Altitude
+option.HAZE_ALTITUDE.comment=Altitude (Y) where the haze is the densest: set it to the bottom of your valleys. Below, the density stays the same.
+option.HAZE_HEIGHT=Valley Haze Thickness
+option.HAZE_HEIGHT.comment=Scale height in metres (scaled): the density is divided by 2.7 every this many metres above the haze altitude. Higher = the haze rises up the mountains.

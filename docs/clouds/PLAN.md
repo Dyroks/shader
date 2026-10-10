@@ -15,7 +15,7 @@ Base du pack : SEUS PTGI HRR 2.1 GFME, Iris 1.11.7, Minecraft 26.3, Voxy.
 | 5 | Variété : couches moyennes et hautes (Ac, As, Ci, Cs, Cc), cumulonimbus et enclume, régimes météo, éclairs | ✅ testée en jeu (« très bon », pas de problème) |
 | 6 | Accélération (révisée après mesures : saut hiérarchique des zones vides), intérieur et nuages proches | ✅ testée en jeu (meilleures performances, intérieur des nuages bon) |
 | 7 | Forme et éclairage des cumulus (retour : trop ronds, adoucis, blancs partout) : forme en chou-fleur, surface trouvée précisément, éclairage calibré sur une référence par path tracing, 2 bugs anciens corrigés | ✅ testée en jeu (« beaucoup mieux », assombrissement brusque sous la couche moyenne corrigé ensuite) |
-| 8 | Rayons crépusculaires : nouvelle carte d'ombre des nuages en espace lumière (2 cascades, ±80 km), ombre des nuages dans l'air intégrée avec l'atmosphère physique | 🧪 à tester en jeu |
+| 8 | Rayons crépusculaires : nouvelle carte d'ombre des nuages en espace lumière (2 cascades, ±80 km), ombre des nuages dans l'air intégrée avec l'atmosphère physique ; 8b : brume des vallées (milieu participant éclairé et ombré par les nuages) | 🧪 8 testée (rayons trop rares et trop faibles) → 8b à tester en jeu |
 
 La bibliothèque de nuages simulés (prévue en phase 7) est écartée : formes figées et répétitives (décision de l'utilisateur).
 
@@ -71,7 +71,32 @@ champ du soleil, derrière la caméra (anticrépusculaires), et autour des nuage
 | **Intégration** (`lib/atmosphere/Crepuscular.inc`, `composite4`) | 24 pas (option) répartis quadratiquement jusqu'à 100 km (option) ou jusqu'au sommet de la couche de nuages, gigue stratifiée filtrée par le TAA. Lumière retirée devant les nuages, et derrière eux × leur transmittance. La lumière diffusée à travers les nuages fins éclaire encore l'air dessous (isotrope). La nuit : lune. Soustraction bornée sans changer la teinte. |
 | **Intensité** (`CREPUSCULAR_STRENGTH`, 150 %) | 100 % = physique (dépend de la brume, *Brume*). Au-delà, les faisceaux d'ombre sont plus sombres, mais jamais plus que de l'air sans lumière directe (pas de trous noirs). |
 | **Rayons du pack** | Les rayons proches (ombres du relief, carte d'ombre du pack) sont conservés, mais ajoutés après les nuages (avant, ils étaient atténués par les nuages situés derrière eux) ; leur lecture de l'ombre des nuages passe à une lecture unique par pas. |
+| **Brume des vallées** (8b, `HAZE_*`) | Voir plus bas. |
 | **Coût** (hors jeu) | Intégration ≈ +13 % du temps de la marche des nuages à résolution égale ; en jeu elle tourne à pleine résolution interne (×4 pixels par rapport à la marche en damier) : ordre de grandeur, la moitié du coût des nuages. Carte d'ombre ≈ 2 × l'ancienne. À mesurer en jeu ; *Qualité des rayons* 16 pour économiser. |
+
+### Phase 8b : brume des vallées (retour du test de la phase 8)
+
+**Retour** : rayons visibles trop rarement et trop faibles, même en *Brume* « Brumeux » et 300 % (vue d'un sommet vers
+une vallée, soleil derrière des cumulus). Photo de référence : grands faisceaux en éventail au-dessus de vallées brumeuses.
+
+**Diagnostic** (scène reproduite hors jeu, mesures en linéaire) : l'ombrage de l'air était déjà volumétrique ; c'est
+le **milieu** qui manquait. Les aérosols du modèle Hillaire sont planétaires (exp(−h/1,2 km) depuis Y = 63 ; 0,004 /km
+× *Brume*) : au-dessus d'une vallée en altitude, l'extinction est d'environ 0,01 à 0,03 /km, alors que des faisceaux
+visibles demandent 0,1 à 0,5 /km (visibilité 10 à 40 km). Et quand le milieu est fin, un rayon de vue traverse des
+dizaines de faisceaux sur des dizaines de km : leurs contrastes se moyennent et il ne reste qu'un voile uniforme. Une
+brume dense limite la profondeur visible à quelques km : le motif des ombres reste lisible.
+
+| Élément | Implémentation |
+|---|---|
+| **Milieu** (`Crepuscular.inc`) | Couche d'aérosols propre : extinction `0,01 × 2^HAZE_DENSITY` /km (0,02 à 0,64, visibilité 190 à 6 km), constante sous `HAZE_ALTITUDE`, puis décroissance exponentielle (hauteur d'échelle `HAZE_HEIGHT`, × échelle). Ångström 1,3 (le bleu est plus atténué : soleil rasant rougi), albédo 0,92, phase à deux lobes (HG 0,78 vers l'avant + 15 % HG −0,3 vers l'arrière, plus de diffusion latérale que Cornette-Shanks). Pluie : × (1 + 2 × humidité). Éteinte dans les grottes comme la perspective atmosphérique. |
+| **Éclairage de la brume** | Soleil (transmittance de l'atmosphère, colonne de brume au-dessus du point / hauteur du soleil, ombre des nuages), lumière diffusée par les nuages fins (isotrope), sol éclairé par le soleil sous la brume (albédo 0,2), diffusion multiple = table de diffusion multiple de Hillaire (champ de lumière du ciel et du sol, comme pour l'air). La nuit : lune ; sans lumière au-dessus de l'horizon : radiance moyenne du ciel. |
+| **Entrelacement air / brume** | Avec la brume, la lumière de l'air du segment parcouru est retirée telle que le ciel et la perspective l'ont intégrée (éclairée, sans brume), puis rajoutée ombrée et atténuée par la brume située devant : `(couleur − air0) × T_brume + air1 + brume`. Sans cela, la brume atténuait aussi l'air bleu devant elle (horizon brunâtre, deux fois trop sombre). Nuages : seule la brume devant eux les atténue ; le fond : toute la brume. |
+| **Intensité** (`CREPUSCULAR_STRENGTH`) | N'exagère plus que l'ombre des nuages bas et moyens (`CloudShadowOpticalDepthSplit`) : à 300 %, le voile uniforme des cirrus coupait la moitié de la lumière partout. Formulation unique pour l'air et la brume : lumière directe effective = clamp(1 − intensité × (1 − e^−od), 0, 1) × e^−od(cirrus), ce qui remplace l'ancienne borne. |
+| **Perspective atmosphérique** | L'air retiré sur le relief suit le même facteur que `LandAtmosphericScattering` (*Perspective atmosphérique* × lumière du ciel à l'œil) : la soustraction était incohérente avec un réglage ≠ 1. |
+| **Coût** (hors jeu) | Brume ≈ +10 % du coût des rayons (1 lecture de table de diffusion multiple et quelques exponentielles par pas). Brume seule (rayons désactivés) : moins cher que les rayons. |
+
+Réglages conseillés pour une carte de montagne : *Altitude de la brume* = fond des vallées, *Brume des vallées*
+Marquée ou Dense, *Épaisseur* 800 à 1000 m (elle monte sur les versants), *Intensité des rayons* 150 à 300 %.
 
 ## Phase 7 : forme et éclairage des cumulus
 
@@ -255,6 +280,9 @@ composite4.fsh   composition             couleurs du soleil et du ciel, perspect
 - Rayons crépusculaires : après le coucher du soleil, la lumière des ombres passe à la lune (choix d'Iris) : pas de
   rayons du soleil sous l'horizon. Les réflexions et la GI ne voient pas les rayons. Le relief ne projette des rayons
   que dans la portée de la carte d'ombre du pack (rayons proches), pas les montagnes lointaines de Voxy.
+- Brume des vallées : le relief ne l'ombre pas au-delà des rayons proches (pas de carte d'ombre des montagnes de Voxy) :
+  au soleil rasant, la brume d'une vallée à l'ombre d'une montagne reste éclairée. Elle ne suit pas le relief (altitude
+  absolue), n'atténue pas la lumière du soleil sur le terrain, et n'apparaît pas dans les réflexions ni dans la GI.
 
 ## Protocole de test en jeu
 
@@ -286,6 +314,10 @@ composite4.fsh   composition             couleurs du soleil et du ciel, perspect
      désactivés et *Intensité des rayons* 100 / 150 / 250 %, *Brume* 3 / 4. Vérifier le bruit en mouvement (*Qualité
      des rayons*) et les FPS. Vérifier aussi les ombres des nuages sur le relief au coucher du soleil (elles portent
      maintenant jusqu'au soleil rasant).
+   - S12 (phase 8b) : même scène que la capture du retour (sommet, vallée, soleil derrière des cumulus) : *Altitude de
+     la brume* au fond de la vallée, *Brume des vallées* Normale / Marquée / Dense, *Épaisseur* 600 / 1000 m,
+     *Intensité des rayons* 150 / 300 %. Vérifier : faisceaux dans la vallée, horizon (pas de bande sombre), ciel au
+     zénith peu changé, grottes (pas de brume), pluie, nuit (lune), FPS brume Désactivée contre Normale.
    - S8 (phase 4) : comparer *Atmosphère* SEUS / Physique à midi, au coucher du soleil, au crépuscule (`/time set 12800`),
      la nuit, sous la pluie, depuis un sommet (brume sur le relief lointain de Voxy, qui doit se fondre dans le ciel à
      l'horizon) et en vol très haut. FPS SEUS contre Physique.
@@ -314,6 +346,7 @@ CLOUD_DUMP_WEATHER=dir python3 tools/cloud_preview.py out.png   # enregistre les
 PROF=1 python3 tools/cloud_preview.py out.png --frames 1   # itérations par catégorie (vide, grossier, fin, échantillons)
 python3 tools/cloud_preview.py out.png --yaw -32 --slice 1000 3500 1300 2300   # coupe verticale de la densité (+ paramètres météo)
 DUMP_LINEAR=img.npy python3 tools/cloud_preview.py out.png   # image linéaire + transmittance (.npy) pour mesurer les luminances
+python3 tools/cloud_preview.py out.png -D AIR_DEBUG=1   # air bas : 1 = transmittance de la brume, 2 = lumière ajoutée, 3 = lumière retirée (avec DUMP_LINEAR : valeurs en unités du ciel)
 python3 tools/cloud_preview.py out.png -D CLOUD_LIGHT_RATIO=3.2   # define supplémentaire (constantes internes)
 python3 tools/cloud_reference.py render 250 256 ref250.npz   # référence path tracing (sphère de 250 m, 256 spp, ~3 min)
 python3 tools/cloud_reference.py fit 250:ref250.npz,600:ref600.npz   # ajuste les constantes de l'éclairage

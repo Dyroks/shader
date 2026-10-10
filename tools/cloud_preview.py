@@ -124,7 +124,7 @@ vec3 SkyAmbient() {
 
 #include "/lib/clouds/CloudLookups.inc"
 #include "/lib/clouds/CloudComposite.inc"
-#if defined CREPUSCULAR_RAYS && defined CLOUD_SHADOWS && ATMOSPHERE_MODEL == 1
+#if ATMOSPHERE_MODEL == 1
 #include "/lib/atmosphere/Crepuscular.inc"
 #endif
 uniform sampler2D noisetex;
@@ -166,10 +166,13 @@ void main() {
 	vec3 U = n * 0.12;
 	vec2 cloudTD;
 	CloudComposite(U, dir, tc, skyAmb, cloudTD);
-	#if defined CREPUSCULAR_RAYS && defined CLOUD_SHADOWS && ATMOSPHERE_MODEL == 1
+	#ifdef AIR_LIGHT_ACTIVE
 		vec3 nz = fract(texelFetch(noisetex, px & 63, 0).rgb + vec3(0.447213595, 1.41421356, 1.61803398) * float(frameCounter % 64));
-		vec3 crep = CrepuscularShadowedLight(dir, CloudSurfaceDistance(tc), cloudTD, nz) * cloudToComposite;
-		U = CrepuscularApply(U, crep);
+		AirLight air = AirLightIntegrate(dir, CloudSurfaceDistance(tc), cloudTD, nz, skyAmb, 1.0);
+		U = AirLightApply(U, air, cloudToComposite);
+		#ifdef AIR_DEBUG   // 1: haze transmittance, 2: haze in-scattering, 3: light removed from the air
+			U = (AIR_DEBUG == 1 ? air.T : AIR_DEBUG == 2 ? air.inscatter : air.removed) * 120.0;
+		#endif
 	#endif
 	if (showCapture != 0) {
 		vec2 uv = tc / vec2(0.5 * viewHeight / viewWidth, 0.5) / 0.4;   // square inset, bottom left
@@ -381,7 +384,7 @@ def main():
     pSkip = program("begin_c.csh")
     pAtmoT, pAtmoMS, pAtmoSV = program("begin_d.csh"), program("begin_e.csh"), program("begin_f.csh")
     disp_src = DISPLAY_SHADER.replace("%SEUS%", seus_sky_functions())
-    pDisp = ctx.compute_shader(build_source(disp_src, overrides, [], is_text=True))
+    pDisp = ctx.compute_shader(build_source(disp_src, overrides, extra, is_text=True))
 
     units = {"cloudNoiseBase": base, "cloudNoiseDetail": detail, "cloudCurl": curl, "cloudCirrus": cirrus, "noisetex": noisetex,
              "depthtex0": depthtex, "cloudRegimeSampler": regime, "cloudWeatherNearSampler": wNear, "cloudWeatherFarSampler": wFar,

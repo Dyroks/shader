@@ -35,7 +35,7 @@ option.ATMOSPHERE_MODEL=Atmosphère
 option.ATMOSPHERE_MODEL.comment=SEUS : le ciel d'origine. Physique : diffusion précalculée de Hillaire 2020 (Rayleigh, aérosols, ozone, diffusion multiple), cohérente avec la lumière du soleil, correcte vue de n'importe quelle altitude, avec une brume physique sur le relief et les nuages lointains.
 value.ATMOSPHERE_MODEL.0=SEUS
 value.ATMOSPHERE_MODEL.1=Physique
-option.ATMOSPHERE_HAZE=Brume
+option.ATMOSPHERE_HAZE=Brume (atmosphère)
 option.ATMOSPHERE_HAZE.comment=Atmosphère physique : quantité d'aérosols dans les premiers kilomètres (visibilité). La pluie en ajoute.
 value.ATMOSPHERE_HAZE.0=Air très pur
 value.ATMOSPHERE_HAZE.1=Air pur
@@ -364,8 +364,21 @@ option.WEATHER.comment=Dessine la pluie et la neige. Encore en développement et
 option.CREPUSCULAR_RAYS=Rayons crépusculaires
 option.CREPUSCULAR_RAYS.comment=Ombres des nuages dans l'air : faisceaux de lumière entre les nuages, rayons en éventail au coucher du soleil, rayons anticrépusculaires convergeant à l'opposé du soleil. Nécessite l'atmosphère physique et les ombres des nuages.
 option.CREPUSCULAR_STRENGTH=Intensité des rayons
-option.CREPUSCULAR_STRENGTH.comment=100 % = physique (les rayons dépendent aussi de la brume). Plus haut = faisceaux d'ombre plus sombres, plus spectaculaire, jamais plus sombre qu'un air sans lumière directe.
+option.CREPUSCULAR_STRENGTH.comment=100 % = physique (les rayons dépendent surtout de la brume des vallées). Plus haut = faisceaux d'ombre plus sombres sous les nuages bas, plus spectaculaire, jamais plus sombre qu'un air sans lumière directe.
 option.CREPUSCULAR_STEPS=Qualité des rayons
 option.CREPUSCULAR_STEPS.comment=Échantillons le long de chaque rayon de vue. Plus = moins de bruit en mouvement, plus lent.
 option.CREPUSCULAR_DISTANCE=Distance des rayons
 option.CREPUSCULAR_DISTANCE.comment=Distance maximale des rayons en km (× échelle). Les rayons du coucher de soleil demandent de grandes distances.
+option.HAZE_DENSITY=Brume des vallées
+option.HAZE_DENSITY.comment=Atmosphère physique : couche de brume dense près du sol, qui s'accumule dans les vallées, éclairée par le soleil et ombrée par les nuages : c'est elle qui rend les faisceaux de lumière visibles. Visibilité là où elle est la plus dense. La pluie en ajoute.
+value.HAZE_DENSITY.0=Désactivée
+value.HAZE_DENSITY.1=Très légère (190 km)
+value.HAZE_DENSITY.2=Légère (100 km)
+value.HAZE_DENSITY.3=Normale (50 km)
+value.HAZE_DENSITY.4=Marquée (25 km)
+value.HAZE_DENSITY.5=Dense (12 km)
+value.HAZE_DENSITY.6=Très dense (6 km)
+option.HAZE_ALTITUDE=Altitude de la brume
+option.HAZE_ALTITUDE.comment=Altitude (Y) où la brume est la plus dense : réglez-la au fond de vos vallées. En dessous, la densité reste la même.
+option.HAZE_HEIGHT=Épaisseur de la brume
+option.HAZE_HEIGHT.comment=Hauteur d'échelle en mètres (× échelle) : la densité est divisée par 2,7 tous les X mètres au-dessus de l'altitude de la brume. Plus haut = la brume monte sur les montagnes.

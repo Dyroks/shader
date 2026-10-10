@@ -127,6 +127,16 @@ float CloudShadowOpticalDepth(CloudShadowFrame f, vec3 relPos, vec2 jitter, bool
 	return od * c.w;
 }
 
+// Stochastic lookup split into (low + mid clouds, high clouds): the crepuscular rays exaggerate
+// only the shadows of the low clouds (the shafts), not the uniform veil of the cirrus
+vec2 CloudShadowOpticalDepthSplit(CloudShadowFrame f, vec3 relPos, vec2 jitter) {
+	vec4 c = CloudShadowCoords(f, relPos);
+	if (c.w <= 0.0) return vec2(0.0);
+	vec4 t = texelFetch(cloudShadowSampler, ivec2(c.xy + jitter), 0);
+	float high = cameraPosition.y + relPos.y < cloudHighAlt ? t.w : 0.0;
+	return vec2(CloudShadowTexelOD(t, c.z, false), high) * c.w;
+}
+
 // Light that goes through the clouds: direct transmittance + light that diffused through
 // them (thin clouds and cloud edges let some light through, thick cumulus cast dark shadows)
 float CloudShadowTransmittance(float od) {

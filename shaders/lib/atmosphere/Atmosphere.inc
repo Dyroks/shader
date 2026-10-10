@@ -72,6 +72,11 @@ float AtmoPhaseMie(float c, float g) {
 	return 3.0 / (8.0 * atmoPI) * (1.0 - g2) * (1.0 + c * c) / ((2.0 + g2) * d * sqrt(d));
 }
 
+float AtmoPhaseHG(float c, float g) {
+	float d = 1.0 + g * g - 2.0 * g * c;
+	return (1.0 - g * g) / (4.0 * atmoPI * d * sqrt(d));
+}
+
 // ---- Geometry -------------------------------------------------------------------------
 // Distance to a sphere of radius R centred on the planet from ro (planet centred), -1 if missed
 float AtmoRaySphere(vec3 ro, vec3 rd, float R) {
