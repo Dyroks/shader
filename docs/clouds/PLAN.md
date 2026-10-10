@@ -83,7 +83,10 @@ lot 2*). Mesure GPU par passe : procédure dans le document de suivi (RenderDoc 
 - Écarts voulus avec la GI d'origine : directions pondérées par le cosinus (moins de bruit, éclairage rasant moins
   fort, zénith plus fort ; même luminosité sous un ciel uniforme) ; une torche (voxel de lumière) arrête le rayon
   au lieu d'être traversée (nécessaire à ReSTIR : chaque échantillon a un point touché), sauf celle qui contient
-  l'origine du rayon ; `GI_SCREEN_SPACE_TRACING` n'est pas repris.
+  l'origine du rayon ; sur une surface à carte de normales, une direction qui passe sous la surface géométrique est
+  réfléchie ; un rayon qui épuise ses pas juste après un vitrage ou une feuille voit le ciel ;
+  `GI_SCREEN_SPACE_TRACING` n'est pas repris. Relecture indépendante du code contre la GI d'origine : aucun autre
+  écart (un écart sous l'eau, la réflexion totale à la surface, corrigé).
 - Dépendances SEUS restantes : test de forme des blocs (`BlockShapes_*.glsl`), cache de lumière (`colortex5`,
   remplacé en E5), fonctions de `Common.inc` (`MakeRay`, `TintUnderwaterDepth`), texture de bruit bleu.
 - Option *Vue de débogage de la GI* (`GI_DEBUG_VIEW`) : lumière de la GI seule sur des surfaces blanches.

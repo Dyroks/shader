@@ -64,7 +64,8 @@ vec3 GiSunAtHit(vec3 rel, vec3 normal) {
 vec3 GiSkyRadiance(vec3 dir) {
 	if (isEyeInWater == 1) {
 		vec3 refracted = refract(dir, vec3(0.0, -1.0, 0.0), 1.3333);
-		if (dot(refracted, refracted) > 0.5) dir = refracted;
+		if (dot(refracted, refracted) < 0.5) return vec3(0.0);   // total internal reflection at the surface
+		dir = refracted;
 	}
 	#if defined VOLUMETRIC_CLOUDS && defined CLOUD_SKY_LIGHTING
 		vec3 sky = CloudSkyLookup(dir).rgb;
