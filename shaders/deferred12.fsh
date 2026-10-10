@@ -64,11 +64,7 @@ const int colortex2Format = RGBA16;
 const int colortex3Format = RGBA16_SNORM;
 const int colortex4Format = RGBA32F;
 const int colortex5Format = RGBA32F;
-#ifdef AB_POST
 const int colortex6Format = RGBA16F; // temporal history (gamma encoded colour, exposure < 400): 16-bit float is enough
-#else
-const int colortex6Format = RGBA32F;
-#endif
 const int colortex7Format = RGBA16F;
 const int colortex17Format = RGBA16;
 const int colortex18Format = RGBA16;
@@ -168,16 +164,10 @@ float RayTracedShadow(vec3 worldPos, vec3 worldNormal, vec3 worldGeoNormal, vec3
 			}
 			vec3 rayPos = fract(ray.origin + ray.direction * rayLength) - 0.5;
 			vec2 texCoordOffset = vec2(0.0);
-			#ifdef AB_SUN_SHADOW
 			// one of the three terms is non zero (axis aligned hit normal): accumulate, as in the GI
 			texCoordOffset += vec2(rayPos.z * -targetNormal.x, -rayPos.y) * abs(targetNormal.x);
 			texCoordOffset += vec2(rayPos.x, rayPos.z * targetNormal.y) * abs(targetNormal.y);
 			texCoordOffset += vec2(rayPos.x * targetNormal.z, -rayPos.y) * abs(targetNormal.z);
-			#else
-			texCoordOffset = vec2(rayPos.z * -targetNormal.x, -rayPos.y) * abs(targetNormal.x);
-			texCoordOffset = vec2(rayPos.x, rayPos.z * targetNormal.y) * abs(targetNormal.y);
-			texCoordOffset = vec2(rayPos.x * targetNormal.z, -rayPos.y) * abs(targetNormal.z);
-			#endif
 			vec4 blockData = texelFetch(shadowcolor1, ivec2(shadowCoord), 0);
 			float textureResolusion = TEXTURE_RESOLUTION;
 			#if TEXTURE_RESOLUTION == 0
@@ -300,9 +290,6 @@ vec3 CalculateSunlightVisibility(vec4 screenSpacePosition, MaterialMask frnQIYJj
 
 		shading += clamp(shadow2DLod(shadowtex0, vec3(shadowProjPos.st + coordOffset, shadowPosZ), 0).x + float(shadowPosZ > 1.0), 0.0, 1.0);
 		stainedGlassShadow += clamp(shadow2DLod(shadowtex0, vec3(stainedGlassShadowProjPosTemp, shadowPosZ) + float(shadowPosZ > 1.0), 0).x, 0.0, 1.0);
-		#ifndef AB_SUN_SHADOW
-		stainedGlassColor += texture2DLod(shadowcolor, vec2(stainedGlassShadowProjPosTemp), 0).rgb;
-		#endif
 	}
 	shading /= 25.;
 	shading = saturate(shading * (1.0 + avgDepth * 5.0  / (abs(dot(worldGeoNormal, worldLightVector)) + 0.001)));
@@ -311,7 +298,6 @@ vec3 CalculateSunlightVisibility(vec4 screenSpacePosition, MaterialMask frnQIYJj
 	if(shading < 0.01)
 		return result;
 
-	#ifdef AB_SUN_SHADOW
 	// The glass colour only matters where a sample is behind stained glass: read it in a second pass
 	// over the same sample positions (without glass, the mix() below returns result unchanged)
 	if(stainedGlassShadow < 24.9999)
@@ -325,14 +311,11 @@ vec3 CalculateSunlightVisibility(vec4 screenSpacePosition, MaterialMask frnQIYJj
 			vec2 coordOffset = vec2(cos(r), sin(r)) * spread * sqrt(fi);
 			stainedGlassColor += texture2DLod(shadowcolor, stainedGlassShadowProjPos + coordOffset, 0).rgb;
 		}
-	#endif
 	stainedGlassShadow /= 25.0;
 	stainedGlassColor /= 25.0;
 	stainedGlassColor *= stainedGlassColor;
 	result = mix(result * stainedGlassColor, result, vec3(stainedGlassShadow));
-	#ifdef AB_SUN_SHADOW
 	}
-	#endif
 
 
 	// CAUSTICS
@@ -560,8 +543,7 @@ vec3 SpecularGGX(vec3 N, vec3 V, vec3 L, float roughness, float F0)
            float G=24.*(1.-sqrt(wetness)),l=OrenNayar(y,-m,worldLightVector);
            if(x.leaves>.5)
              l=mix(l,.5,.5);
-           #ifdef AB_SUN_SHADOW
-           // Same product as below, cheapest factors first: the shadow tests only run when the light can
+           // Sunlight visibility, cheapest factors first: the shadow tests only run when the light can
            // still reach the surface (diffuse and specular are zero on faces turned away from the light,
            // except leaves which get half of it through)
            float sunVisibility=1.;
@@ -584,21 +566,6 @@ vec3 SpecularGGX(vec3 N, vec3 V, vec3 L, float roughness, float F0)
            vec3 Y=vec3(0.);
            if(sunVisibility>0.)
              Y=CalculateSunlightVisibility(s,x,c,v.parallaxOffset)*(G*SUNLIGHT_BRIGHTNESS*sunVisibility);
-           #else
-           vec3 Y=CalculateSunlightVisibility(s,x,c,v.parallaxOffset)*G*SUNLIGHT_BRIGHTNESS;
-           #ifdef SUNLIGHT_LEAK_FIX
-           Y*=mix(1.0,saturate(v.mcLightmap.y*100.),step(float(isEyeInWater),.5));
-           #endif
-           #ifdef RAY_TRACE_SHADOW
-           Y*=RayTracedShadow(a.xyz,y,c,m,v.parallaxOffset);
-           #endif
-           #ifdef SCREEN_SPACE_SHADOW
-           Y*=ScreenSpaceShadow(s.xyz,f.xyz,v.geoNormal.xyz,x,randomness.x);
-           #endif
-           #if defined VOLUMETRIC_CLOUDS && defined CLOUD_SHADOWS
-           Y*=CloudShadowLookup(a.xyz,worldLightVector);
-           #endif
-           #endif
            n+=TintUnderwaterDepth(DoNightEyeAtNight(l*v.albedo.xyz*Y*colorSunlight,timeMidnight));
            vec3 R=SpecularGGX(y,-m,worldLightVector,1.-v.smoothness,v.metalness*.96+.04)*Y;
            R*=mix(vec3(1.),v.albedo.xyz,vec3(v.metalness));

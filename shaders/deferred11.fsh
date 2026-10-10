@@ -90,12 +90,10 @@ vec3 WorldPosToShadowProjPosBias(vec3 worldPos, vec3 worldNormal)
      d=GetViewPosition(texcoord.xy,R).xyz;
    }
    int taps=1;
-   #ifdef AB_GI_VOLUME
    // sky or outside the voxel volume: no filtering (see PathTraceDenoiser.glsl), caustics still needed
    vec3 worldPosC=mat3(gbufferModelViewInverse)*d+gbufferModelViewInverse[3].xyz;
    if(R>=1.0||max(max(abs(worldPosC.x),abs(worldPosC.y)),abs(worldPosC.z))>RAY_TRACING_RADIUS)
      taps=0;
-   #endif
    float o=-d.z;
    vec3 H=normalize(d);
    vec2 j=vec2(0.0);

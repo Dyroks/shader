@@ -31,12 +31,10 @@ void main() {
 
 
 	vec3 sum = vec3(0.0);
-	#ifdef AB_POST
 	// camera still: the taps would all land within a few hundredths of a pixel
 	if (dot(abs(velocity * ScreenSize), vec2(1.0)) < 0.01)
 		sum = color * 5.0;
 	else
-	#endif
 	for (int i = -2; i <= 2; i++)
 	{
 		vec2 offs = float(i + dither.x) * velocity;

@@ -17,7 +17,7 @@ flat in float textureResolution;
 #include "/lib/GBufferData.inc"
 #include "/lib/GBuffersCommon.inc"
 
-#if defined PARALLAX && defined AB_SURFACES
+#if defined PARALLAX
 // Parallax only pushes the surface away from the camera: declaring it keeps the early depth test, which
 // any write to gl_FragDepth disables otherwise (GL_ARB_conservative_depth, core in OpenGL 4.2; not guarded
 // by #ifdef GL_ARB_conservative_depth, which Iris's preprocessor would evaluate as undefined)
@@ -201,11 +201,7 @@ void main()
 		projPos /= projPos.w;
 		projPos = projPos * 0.5 + 0.5;
 
-		#ifdef AB_SURFACES
 		gl_FragDepth = offsetCoord.z < 1.0 ? max(projPos.z, gl_FragCoord.z) : gl_FragCoord.z;
-		#else
-		gl_FragDepth = projPos.z;
-		#endif
 
 		gbuffer.parallaxOffset = (1.0 - offsetCoord.z);
 

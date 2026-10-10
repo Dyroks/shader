@@ -84,12 +84,10 @@ vec3 GetWaterParallaxCoord(in vec3 position, vec3 viewVector, float fadeFactor)
 {
 	vec3 parallaxCoord = position.xyz;
 
-	#ifdef AB_SURFACES
 	// The relief fades out with the waves themselves: none where they are nearly flat (far away)
 	float parallaxWeight = smoothstep(0.15, 0.3, fadeFactor);
 	if (parallaxWeight <= 0.0)
 		return position;
-	#endif
 
 	vec3 stepScale = vec3(0.6f * WATER_WAVE_HEIGHT, 0.6f * WATER_WAVE_HEIGHT, 1.0f) * 0.5;
 
@@ -108,9 +106,7 @@ vec3 GetWaterParallaxCoord(in vec3 position, vec3 viewVector, float fadeFactor)
 			sampleHeight = GetWaves(position + vec3(pCoord.x, 0.0f, pCoord.y), fadeFactor);
 		}
 
-	#ifdef AB_SURFACES
 	pCoord.xy *= parallaxWeight;
-	#endif
 	parallaxCoord = position.xyz + vec3(pCoord.x, 0.0f, pCoord.y);
 
 	return parallaxCoord;
@@ -264,26 +260,18 @@ void voxy_emitFragment(VoxyFragmentParameters parameters) {
     float fadeFactor = viewDepthInv * dot(viewDir, tbn[2]) * gbufferProjection[1].y * viewHeight;
 	fadeFactor = fadeFactor / (fadeFactor + 50.0);
 
-	#ifdef AB_SURFACES
 	// Tangent space view direction normalized (it was the view position: parallax steps of tens of blocks);
 	// waves only for water (matID was tested against 7.0 after the +0.1, so glass and slime got them)
 	vec3 wavesNormal = vec3(0.0, 0.0, 1.0);
 	if (abs(matID - 6.1) < 0.01)
 		wavesNormal = GetWavesNormal(worldPosition, normalize(viewPosition.xyz * tbn), fadeFactor);
-	#else
-	vec3 wavesNormal = GetWavesNormal(worldPosition, viewPosition.xyz * tbn, fadeFactor);
-	#endif
 
 	vec3 waterNormal = wavesNormal;
     vec3 texNormal = vec3(0.0, 0.0, 1.0);
 
     if(blockId == 165)
         waterNormal = SlimeJiggleNormal(texNormal, worldPosition);
-    #ifdef AB_SURFACES
     else if(abs(matID - 7.1) < 0.01)
-    #else
-    else if(matID == 7.0)
-    #endif
         waterNormal = texNormal;
 
 	#ifdef RAIN_SPLASH_EFFECT

@@ -16,7 +16,7 @@ Base du pack : SEUS PTGI HRR 2.1 GFME, Iris 1.11.7, Minecraft 26.3, Voxy.
 | 6 | Accélération (révisée après mesures : saut hiérarchique des zones vides), intérieur et nuages proches | ✅ testée en jeu (meilleures performances, intérieur des nuages bon) |
 | 7 | Forme et éclairage des cumulus (retour : trop ronds, adoucis, blancs partout) : forme en chou-fleur, surface trouvée précisément, éclairage calibré sur une référence par path tracing, 2 bugs anciens corrigés | ✅ testée en jeu (« beaucoup mieux », assombrissement brusque sous la couche moyenne corrigé ensuite) |
 | 8 | Rayons crépusculaires : nouvelle carte d'ombre des nuages en espace lumière (2 cascades, ±80 km), ombre des nuages dans l'air intégrée avec l'atmosphère physique ; 8b : brume des vallées (milieu participant éclairé et ombré par les nuages) | 🧪 8 testée (rayons trop rares et trop faibles) → 8b testée (perte de FPS) → 8c testée (FPS en partie récupérés, bruit) → 8d à tester en jeu |
-| 9 | Audit performance, lot 1 : travail inutile supprimé sans changer l'image, bugs corrigés (voir la section Phase 9) | 🧪 à tester en jeu, chaque partie comparable (écran *Comparaison du lot 1*) |
+| 9 | Audit performance, lot 1 : travail inutile supprimé sans changer l'image, bugs corrigés (voir la section Phase 9) | ✅ testé en jeu (+6 à 7 FPS, aucun bug, rendu stable) ; options de comparaison retirées, code définitif |
 
 La bibliothèque de nuages simulés (prévue en phase 7) est écartée : formes figées et répétitives (décision de l'utilisateur).
 
@@ -65,16 +65,16 @@ ces options et l'ancien code seront retirés une fois validés.
 
 | Partie | Option | Contenu | État |
 |---|---|---|---|
-| 1-A | `AB_GI_VOLUME` | O1, O2, O7, O11, V2 : GI et reflets limités au volume de voxels | à tester |
-| 1-B | `AB_SUN_SHADOW` | O3, O4, V3 : ombres du soleil | à tester |
-| 1-C | `AB_SURFACES` | O5, O6, S3, V4, V9 : surfaces du terrain et de l'eau | à tester |
-| 1-D | `AB_LOD_DISTANCE` | V1 : perspective aérienne du terrain Voxy à sa vraie distance | à tester |
-| 1-E | `AB_POST`, `FINAL_FXAA` | O9, S2, flou de mouvement à l'arrêt ; O8 abandonné | à tester |
-| 1-F | `AB_CLOUD_WEATHER`, `AB_GI_LOOP` | O12 : cartes météo par quarts ; O10 : boucle de GI à deux niveaux | à tester |
+| 1-A | `AB_GI_VOLUME` | O1, O2, O7, O11, V2 : GI et reflets limités au volume de voxels | ✅ définitif |
+| 1-B | `AB_SUN_SHADOW` | O3, O4, V3 : ombres du soleil | ✅ définitif |
+| 1-C | `AB_SURFACES` | O5, O6, S3, V4, V9 : surfaces du terrain et de l'eau | ✅ définitif |
+| 1-D | `AB_LOD_DISTANCE` | V1 : perspective aérienne du terrain Voxy à sa vraie distance | ✅ définitif |
+| 1-E | `AB_POST`, `FINAL_FXAA` | O9, S2, flou de mouvement à l'arrêt ; O8 abandonné | ✅ définitif |
+| 1-F | `AB_CLOUD_WEATHER`, `AB_GI_LOOP` | O12 : cartes météo par quarts ; O10 : boucle de GI à deux niveaux | ✅ définitif |
 
-**Test en jeu** : vue de référence fixe (F3, heure et météo figées). Noter les FPS avec tout activé, puis
-désactiver une option `AB_*` à la fois (rechargement des shaders) et noter les FPS et ce qui change. Une option qui
-ne rapporte rien ou qui abîme l'image est signalée ; les autres seront rendues définitives (code d'origine retiré).
+**Résultat du test** : +6 à 7 FPS, aucun bug, rendu stable. Les options `AB_*` de la table (temporaires) et le code
+d'origine sont retirés. Les coupures entre tronçons sur l'eau Voxy restent : elles apparaissent aussi sans shaders,
+donc elles viennent de Voxy (V9 corrigeait un vrai défaut, mais pas celui-là).
 
 **1-A, GI dans le volume de voxels** (gain estimé 1,5 à 4 ms dans un panorama Voxy) :
 - O1 (`deferred.fsh`) : au-delà de `RAY_TRACING_RADIUS` (±167 blocs), `deferred12` remplace la GI par l'ambiance

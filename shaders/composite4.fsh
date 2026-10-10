@@ -95,7 +95,7 @@ vec3 WorldPosToShadowProjPos(vec3 worldPos)
    {
      i=GetViewPosition(texcoord.xy,v.depth);
    }
-   #if defined LOD && defined AB_LOD_DISTANCE
+   #if defined LOD
    // solid LOD terrain: its own position, not the far plane of the vanilla depth (aerial perspective,
    // underwater fog)
    if(!isWater&&v.depth>=1.0&&lodSolidDepth<1.0)

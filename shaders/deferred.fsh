@@ -22,12 +22,10 @@ flat in vec3 colorSkyUp;
 
 
 #include "/lib/Settings.inc"
-#ifdef AB_GI_VOLUME
 flat in vec3 colorTorchlight;
 flat in vec4 skySHR;
 flat in vec4 skySHG;
 flat in vec4 skySHB;
-#endif
 #include "/lib/Uniforms.inc"
 #include "/lib/Common.inc"
 
@@ -256,10 +254,9 @@ const float RAY_TRACING_RADIUS = RAY_TRACING_DIAMETER / 2.0;
        vec3 stainedColor=vec3(1.);
        ivec2 shadowCoord=ivec2(0);
        float prevID=255.;
-       #ifdef AB_GI_LOOP
        // Two level loop: a short loop walks the empty voxels, the block shape test and the texture
-       // lookups run outside it, once per non empty voxel (same steps and result as below, but the
-       // threads of a warp no longer wait on one another's shape tests at every step)
+       // lookups run outside it, once per non empty voxel (the threads of a warp no longer wait on
+       // one another's shape tests at every step)
        int u=0;
        while(true)
          {
@@ -267,14 +264,12 @@ const float RAY_TRACING_RADIUS = RAY_TRACING_DIAMETER / 2.0;
            for(;u<DIFFUSE_TRACE_LENGTH;u++)
              {
                T.QbpObHBdUl+=T.frnQIYJjVJ*T.fgCeZiNBHZ;
-               #ifdef AB_GI_VOLUME
                if(T.QbpObHBdUl!=clamp(T.QbpObHBdUl,vec3(0.),vec3(RAY_TRACING_DIAMETER-1.)))
                  {
                    // left the volume: escaped, as when the edge of the volume is empty
                    j=255.;
                    break;
                  }
-               #endif
                shadowCoord=ivec2(d(T.QbpObHBdUl));
                U=texelFetch(shadowcolor,shadowCoord,0);
                T.frnQIYJjVJ=step(T.ZKdJsVHIyK.xyz,vec3(min(T.ZKdJsVHIyK.x,min(T.ZKdJsVHIyK.y,T.ZKdJsVHIyK.z))));
@@ -344,79 +339,6 @@ const float RAY_TRACING_RADIUS = RAY_TRACING_DIAMETER / 2.0;
            prevID=j;
            u++;
          }
-       #else
-       for(int u=0;u<DIFFUSE_TRACE_LENGTH;u++)
-         {
-           T.QbpObHBdUl+=T.frnQIYJjVJ*T.fgCeZiNBHZ;
-           #ifdef AB_GI_VOLUME
-           if(T.QbpObHBdUl!=clamp(T.QbpObHBdUl,vec3(0.),vec3(RAY_TRACING_DIAMETER-1.)))
-             {
-               // left the volume: escaped, as when the edge of the volume is empty
-               j=255.;
-               break;
-             }
-           #endif
-           shadowCoord=ivec2(d(T.QbpObHBdUl));
-           U=texelFetch(shadowcolor,shadowCoord,0);
-           T.frnQIYJjVJ=step(T.ZKdJsVHIyK.xyz,vec3(min(T.ZKdJsVHIyK.x,min(T.ZKdJsVHIyK.y,T.ZKdJsVHIyK.z))));
-           T.ZKdJsVHIyK+=T.frnQIYJjVJ*T.ZRrfSsHfvT;
-           G=10000.;
-           j=U.w*255.;
-           if(j<255.)
-             {
-               if(j==241.)
-                 {
-                   if(u==0)
-                     U.xyz*=.5;
-                   y+=U.xyz*stainedColor*.5*GI_LIGHT_TORCH_INTENSITY;
-                   prevID=241.;
-                   continue;
-                 }
-               if((prevID==j&&(j==39.||j==37.))||!c(T.QbpObHBdUl,j,P,G,K))
-                 {
-                   prevID=j;
-                   continue;
-                 }
-               if(abs(j-33.5)<2.)
-                 break;
-               vec3 rayPos=fract(P.origin+P.direction*G)-.5;
-               vec2 coordOffset=vec2(0.);
-               coordOffset+=vec2(rayPos.z*-K.x,-rayPos.y)*abs(K.x);
-               coordOffset+=vec2(rayPos.x,rayPos.z*K.y)*abs(K.y);
-               coordOffset+=vec2(rayPos.x*K.z,-rayPos.y)*abs(K.z);
-               vec4 coordData=texelFetch(shadowcolor1,shadowCoord,0);
-               float textureResolusion=TEXTURE_RESOLUTION;
-               #if TEXTURE_RESOLUTION == 0
-               textureResolusion=exp2(coordData.w*255.);
-               #endif
-               vec2 terrainSize=atlasTexSize/textureResolusion;
-               vec2 coord=(floor(coordData.xy*terrainSize)+.5+coordOffset.xy)/terrainSize;
-               vec4 texColor=texture2DLod(colortex3,coord,0);
-               texColor.xyz=pow(texColor.xyz,vec3(2.2));
-               if(texColor.w>.999||abs(j-61.5)>31.)
-                 {
-                   texColor.xyz*=mix(vec3(1.),U.xyz,vec3(coordData.z));
-                   M=texColor.xyz*stainedColor;
-                   #ifdef MC_SPECULAR_MAP
-                     vec4 specularData=texture2DLod(depthtex0,coord,0);
-                     specular = SpecularData(specularData[SPEC_CHANNEL_SMOOTHNESS], specularData[SPEC_CHANNEL_METALNESS], specularData[SPEC_CHANNEL_EMISSIVE]);
-                     #if SPEC_CHANNEL_EMISSIVE==3
-                     specular.emissive-=step(1.0,specular.emissive);
-                     #endif
-                   #endif
-                   break;
-                 }
-               else if(j==37.)
-                 {
-                   texColor.xyz=normalize(texColor.xyz+1e-4)*pow(dot(texColor.xyz,texColor.xyz),.25);
-                   texColor.xyz=mix(vec3(1.),texColor.xyz,vec3(pow(texColor.w,.2)));
-                   texColor.xyz*=texColor.xyz;
-                   stainedColor*=texColor.xyz;
-                 }
-             }
-           prevID=j;
-         }
-       #endif
        y*=0.25;
        if(j<1.f||j>254.f)
          {
@@ -504,7 +426,6 @@ const float RAY_TRACING_RADIUS = RAY_TRACING_DIAMETER / 2.0;
        }
        vec4 f=gbufferModelViewInverse*vec4(s.xyz,1.),n=gbufferModelViewInverse*vec4(s.xyz,0.);
        vec3 r=normalize(n.xyz),z=normalize((gbufferModelViewInverse*vec4(m.normal,0.)).xyz),e=normalize((gbufferModelViewInverse*vec4(m.geoNormal,0.)).xyz);
-       #ifdef AB_GI_VOLUME
        // Outside the voxel volume deferred12 replaces the GI with the sky ambient (RAY_TRACING_RADIUS - 5
        // to RAY_TRACING_RADIUS): store that ambient instead of tracing from the clamped edge of the volume,
        // so the denoiser blends the transition band toward the same value.
@@ -518,7 +439,6 @@ const float RAY_TRACING_RADIUS = RAY_TRACING_DIAMETER / 2.0;
            i=vec4(F*.1,1.);
          }
        else
-       #endif
        i=c(f.xyz,s.xyz,z,e,r,x,m.mcLightmap.y,m.parallaxOffset);
      }
    gl_FragData[0]=texture2DLod(colortex1,texcoord.xy,0);

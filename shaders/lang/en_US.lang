@@ -386,22 +386,3 @@ option.HAZE_ALTITUDE.comment=Altitude (Y) where the haze is the densest: set it 
 option.HAZE_HEIGHT=Valley Haze Thickness
 option.HAZE_HEIGHT.comment=Scale height in metres (scaled): the density is divided by 2.7 every this many metres above the haze altitude. Higher = the haze rises up the mountains.
 
-# Lot 1 A/B comparison (temporary)
-screen.Lot1=Lot 1 comparison (temporary)
-screen.Lot1.comment=Optimizations of lot 1, each switchable to compare before and after in game. Removed once validated
-option.AB_GI_VOLUME=Lot 1: GI inside the voxel volume
-option.AB_GI_VOLUME.comment=On: no GI tracing beyond the voxel volume (the sky ambient used there is stored directly), GI, light cache and reflection rays stop when they leave the volume, no voxel reflections for distant water, no denoising of the sky or of pixels beyond the volume, Voxy projection fixed in the denoiser. Off: original behaviour
-option.AB_SUN_SHADOW=Lot 1: sun shadows
-option.AB_SUN_SHADOW.comment=On: shadow tests skipped where the sun cannot light the surface (faces turned away, caves, cloud shadow, shadow already found), stained glass colour read only behind stained glass, fixed texture lookup of the ray traced shadow (leaves and open blocks on two faces out of three). Off: original behaviour
-option.AB_SURFACES=Lot 1: terrain and water surfaces
-option.AB_SURFACES.comment=On: early depth test kept on the terrain with Parallax, waves computed only for water (not glass, slime or under the physics ocean), wave relief faded out where the waves are nearly flat (far away), Voxy water: normalized view direction for the wave relief, no waves on distant glass. Off: original behaviour
-option.AB_LOD_DISTANCE=Lot 1: Voxy terrain distance
-option.AB_LOD_DISTANCE.comment=On: the aerial perspective of the Voxy terrain uses its real distance (distant mountains get a haze that grows with distance, adjustable with Distant Terrain Haze). Off: original behaviour, the same haze as at the vanilla render distance
-option.AB_POST=Lot 1: post-processing
-option.AB_POST.comment=On: temporal history stored in 16-bit float instead of 32-bit (half the memory traffic), motion blur skipped while the camera does not move. Off: original behaviour. FXAA is now off by default (the temporal reconstruction already smooths the edges) and its pass is skipped when off
-option.AB_POST=Lot 1: post-processing
-option.AB_POST.comment=On: temporal history stored in 16-bit float instead of 32-bit (half the memory traffic), motion blur skipped while the camera does not move. Off: original behaviour. FXAA is now off by default (the temporal reconstruction already smooths the edges) and its pass is skipped when off
-option.AB_CLOUD_WEATHER=Lot 1: cloud weather maps
-option.AB_CLOUD_WEATHER.comment=On: the two weather maps of the clouds (2048² and 1024²) are refreshed one quarter per frame, and fully when the camera moves to another map texel (every 48 or 400 blocks). Off: original behaviour, both maps fully every frame
-option.AB_GI_LOOP=Lot 1: GI loop
-option.AB_GI_LOOP.comment=On: the GI rays walk the empty voxels in a short loop and test the block shapes outside it (same result, the speed gain depends on the graphics card: compare the FPS). Off: original loop
