@@ -266,6 +266,14 @@ value.SPEC_CHANNEL_EMISSIVE.2=b
 value.SPEC_CHANNEL_EMISSIVE.3=a
 
 # RayTracing
+option.GI_METHOD=GI method
+option.GI_METHOD.comment=How the indirect light (global illumination) is computed. ReSTIR GI: home GI module of the pack (one bounce traced through the voxels, cosine weighted rays; the reuse of the samples between pixels and frames comes in the next steps). SEUS: original GI, kept to compare until the home module is validated. Overworld only for now
+value.GI_METHOD.0=SEUS (original)
+value.GI_METHOD.1=ReSTIR GI
+option.GI_DEBUG_VIEW=GI debug view
+option.GI_DEBUG_VIEW.comment=GI light only: white surfaces, no sunlight, no block light of the pixel itself. Shows the noise and the brightness of the GI alone, to compare the methods
+value.GI_DEBUG_VIEW.0=Off
+value.GI_DEBUG_VIEW.1=GI light only
 option.GI_RAY_COUNT=Ray Tracing Samples
 option.GI_RAY_COUNT.comment=Sample count of ray tracing. Higher values can greatly decrease noise. Extremely impacts performance!
 option.GI_SECONDARY_SAMPLES=Secondary GI Samples

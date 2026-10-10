@@ -45,6 +45,10 @@
     #define SPEC_CHANNEL_METALNESS 1 // [0 1 2 3]
     #define SPEC_CHANNEL_EMISSIVE 3 // [0 1 2 3]
 
+// Global illumination (home GI module, lib/gi)
+#define GI_METHOD 1 // [0 1] 0: original GI of the pack (SEUS, kept for comparison), 1: ReSTIR GI (home module; reuse of the samples not active yet)
+#define GI_DEBUG_VIEW 0 // [0 1] 1: show only the GI light (white surfaces, no direct light)
+
 // Raytracing
 #define GI_RAY_COUNT 1 // [1 2 3 4 5]
 #define GI_SECONDARY_SAMPLES 1 // [1 2 3 4 5 6 7 8]

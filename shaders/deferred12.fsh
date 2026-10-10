@@ -508,6 +508,9 @@ vec3 SpecularGGX(vec3 N, vec3 V, vec3 L, float roughness, float F0)
      farShade=FarShadeUpsample(ivec2(Texcoord*ScreenSize),length(s.xyz));
    #endif
    vec3 n=vec3(0.),t=y;
+   #if GI_DEBUG_VIEW == 1
+   vec3 giDebug=vec3(0.);   // GI light alone (white surfaces, no direct light)
+   #endif
    if(x.sky>.5)
      {
        vec3 p=m.xyz;
@@ -540,6 +543,9 @@ vec3 SpecularGGX(vec3 N, vec3 V, vec3 L, float roughness, float F0)
        #endif
        vec3 w=texture2DLod(colortex7,Texcoord.xy+vec2(0.,HalfScreen.y),0).xyz*10.,T=w*v.albedo.xyz;
        const float h=RAY_TRACING_RADIUS-5.;
+       #if GI_DEBUG_VIEW == 1
+       giDebug=w;
+       #endif
        if(r>h)
          {
            vec3 F=FromSH(skySHR,skySHG,skySHB,y);
@@ -549,6 +555,9 @@ vec3 SpecularGGX(vec3 N, vec3 V, vec3 L, float roughness, float F0)
            #endif
            vec3 R=F*4.5;
            R+=v.mcLightmap.x*colorTorchlight*.0925;
+           #if GI_DEBUG_VIEW == 1
+           giDebug=mix(w,R,vec3(saturate((r-h)*.2)));
+           #endif
            R*=v.albedo.xyz;
            T=mix(T,R,vec3(saturate((r-h)*.2)));
          }
@@ -645,6 +654,10 @@ vec3 SpecularGGX(vec3 N, vec3 V, vec3 L, float roughness, float F0)
        colorTemp+=(nightVision*0.05+1e-4)*(1.-v.metalness);
        n+=colorTemp*v.albedo.rgb;
      }
+   #if GI_DEBUG_VIEW == 1
+   if(x.sky<.5)
+     n=giDebug;
+   #endif
    n*=.001;
    n=LinearToGamma(n);
    gl_FragData[0]=vec4(n.xyz,1.);

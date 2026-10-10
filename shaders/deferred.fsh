@@ -44,6 +44,8 @@ const float RAY_TRACING_DIAMETER = RAY_TRACING_DIAMETER_TEMP - mod(RAY_TRACING_D
 const float RAY_TRACING_RADIUS = RAY_TRACING_DIAMETER / 2.0;
 
 
+#if GI_METHOD == 0
+// ---- original GI of the pack (SEUS), kept for comparison until the home GI is validated ----
  vec2 s(vec3 v)
  {
    ivec2 m=ivec2(viewWidth,viewHeight);
@@ -140,6 +142,8 @@ const float RAY_TRACING_RADIUS = RAY_TRACING_DIAMETER / 2.0;
  }
 
 
+#endif
+
 #if SHAPE_CALC_FUNC == 0
 #include "/program/template/BlockShapes_CompileTime.glsl"
 #else
@@ -147,6 +151,8 @@ const float RAY_TRACING_RADIUS = RAY_TRACING_DIAMETER / 2.0;
 #endif
 
 
+ vec2 Texcoord;
+#if GI_METHOD == 0
  vec3 w(vec2 x)
  {
    vec2 v=vec2(x.xy*ScreenSize);
@@ -156,7 +162,6 @@ const float RAY_TRACING_RADIUS = RAY_TRACING_DIAMETER / 2.0;
    i=fract(i+float(frameCounter%64)*c);
    return i;
  }
- vec2 Texcoord;
  vec3 M(vec2 v)
  {
    float x=2*3.14159*v.x,y=acos(1.-2.*v.y);
@@ -404,6 +409,9 @@ const float RAY_TRACING_RADIUS = RAY_TRACING_DIAMETER / 2.0;
    Y.w=saturate(Y.w*.1);
    return Y;
  }
+#else
+#include "/lib/gi/GiPathTrace.glsl"
+#endif
  void main()
  {
    vec4 i=texture2DLod(colortex7,texcoord.xy,0);
@@ -439,7 +447,11 @@ const float RAY_TRACING_RADIUS = RAY_TRACING_DIAMETER / 2.0;
            i=vec4(F*.1,1.);
          }
        else
+       #if GI_METHOD == 0
        i=c(f.xyz,s.xyz,z,e,r,x,m.mcLightmap.y,m.parallaxOffset);
+       #else
+       i=x.sky>.5?vec4(0.):GiPathTracePixel(f.xyz,z,e,r,m.mcLightmap.y,m.parallaxOffset,ivec2(Texcoord*ScreenSize));
+       #endif
      }
    gl_FragData[0]=texture2DLod(colortex1,texcoord.xy,0);
    gl_FragData[1]=vec4(i);

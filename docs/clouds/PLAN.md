@@ -18,7 +18,7 @@ Base du pack : SEUS PTGI HRR 2.1 GFME, Iris 1.11.7, Minecraft 26.3, Voxy.
 | 8 | Rayons crépusculaires : nouvelle carte d'ombre des nuages en espace lumière (2 cascades, ±80 km), ombre des nuages dans l'air intégrée avec l'atmosphère physique ; 8b : brume des vallées (milieu participant éclairé et ombré par les nuages) | 🧪 8 testée (rayons trop rares et trop faibles) → 8b testée (perte de FPS) → 8c testée (FPS en partie récupérés, bruit) → 8d à tester en jeu |
 | 9 | Audit performance, lot 1 : travail inutile supprimé sans changer l'image, bugs corrigés (voir la section Phase 9) | ✅ testé en jeu (+6 à 7 FPS, aucun bug, rendu stable) ; options de comparaison retirées, code définitif |
 | 10 | Audit, lot 2 : remplacements (faisceaux proches dans l'air, cache de GI, bloom, exposition), ombres lointaines et occlusion (voir la section Phase 10) | ✅ faisceaux dans l'air et bloom définitifs, cache par moitié supprimé ; ombrage lointain encore en option (instable, réévalué en phase 11) |
-| 11 | GI maison : module `lib/gi`, sélecteur de méthode `GI_METHOD` (ReSTIR GI, plus tard Split RC), sortie progressive du code SEUS (voir la section Phase 11 et le [document de suivi](https://claude.ai/code/artifact/c02bd115-300a-45c4-a14d-a9edf9dd3978)) | 🚧 E0 fait, E1 en cours |
+| 11 | GI maison : module `lib/gi`, sélecteur de méthode `GI_METHOD` (ReSTIR GI, plus tard Split RC), sortie progressive du code SEUS (voir la section Phase 11 et le [document de suivi](https://claude.ai/code/artifact/c02bd115-300a-45c4-a14d-a9edf9dd3978)) | 🧪 E0 et E1 à tester en jeu (option *Méthode de GI*) |
 
 La bibliothèque de nuages simulés (prévue en phase 7) est écartée : formes figées et répétitives (décision de l'utilisateur).
 
@@ -73,6 +73,22 @@ Le plan détaillé, l'état des étapes et l'inventaire du code SEUS sont tenus 
 l'air (`composite4.fsh`, seuls les rayons sous l'eau restent) et l'ancien bloom (`GetBloomTap`) sont supprimés ;
 la variante du cache de GI par moitié est supprimée. L'ombrage lointain reste comparable (écran *Comparaison du
 lot 2*). Mesure GPU par passe : procédure dans le document de suivi (RenderDoc ou Nsight Graphics).
+
+**E1, module GI** (`lib/gi/`, option *Méthode de GI* `GI_METHOD`, 1 par défaut) :
+- `GiVolume.glsl` (adressage du volume de voxels dans la carte d'ombre, identifiants des voxels),
+  `GiSampling.glsl` (bruit bleu, suite R2, directions pondérées par le cosinus), `GiTrace.glsl` (marche dans les
+  voxels jusqu'à la première surface : `GiHit` avec position, normale, couleur, émission, transmission des
+  vitraux), `GiLighting.glsl` (ciel, soleil au point touché, cache de lumière, émission), `GiPathTrace.glsl`
+  (un rebond par pixel). Écrit de zéro ; les constantes de luminosité reprennent celles de la GI d'origine.
+- Écarts voulus avec la GI d'origine : directions pondérées par le cosinus (moins de bruit, éclairage rasant moins
+  fort, zénith plus fort ; même luminosité sous un ciel uniforme) ; une torche (voxel de lumière) arrête le rayon
+  au lieu d'être traversée (nécessaire à ReSTIR : chaque échantillon a un point touché), sauf celle qui contient
+  l'origine du rayon ; `GI_SCREEN_SPACE_TRACING` n'est pas repris.
+- Dépendances SEUS restantes : test de forme des blocs (`BlockShapes_*.glsl`), cache de lumière (`colortex5`,
+  remplacé en E5), fonctions de `Common.inc` (`MakeRay`, `TintUnderwaterDepth`), texture de bruit bleu.
+- Option *Vue de débogage de la GI* (`GI_DEBUG_VIEW`) : lumière de la GI seule sur des surfaces blanches.
+- Nether et End : GI d'origine (`program/noSkyVariant`), non concernés pour l'instant.
+- La GI d'origine (`GI_METHOD` 0) est supprimée de `deferred.fsh` dès que la version maison est validée en jeu.
 
 ## Phase 10 : audit performance, lot 2
 

@@ -266,6 +266,14 @@ value.SPEC_CHANNEL_EMISSIVE.2=b
 value.SPEC_CHANNEL_EMISSIVE.3=a
 
 # RayTracing
+option.GI_METHOD=Méthode de GI
+option.GI_METHOD.comment=Calcul de la lumière indirecte (illumination globale). ReSTIR GI : module de GI maison du pack (un rebond tracé dans les voxels, rayons pondérés par le cosinus ; la réutilisation des échantillons entre pixels et entre images arrive aux étapes suivantes). SEUS : GI d'origine, gardée pour comparer jusqu'à la validation du module maison. Monde normal seulement pour l'instant
+value.GI_METHOD.0=SEUS (origine)
+value.GI_METHOD.1=ReSTIR GI
+option.GI_DEBUG_VIEW=Vue de débogage de la GI
+option.GI_DEBUG_VIEW.comment=Lumière de la GI seule : surfaces blanches, sans soleil ni lumière propre du bloc. Montre le bruit et la luminosité de la GI seule, pour comparer les méthodes
+value.GI_DEBUG_VIEW.0=Désactivée
+value.GI_DEBUG_VIEW.1=Lumière de la GI seule
 option.GI_RAY_COUNT=Ray Tracing Échantillons
 option.GI_RAY_COUNT.comment=Nombre de rayons lancés pour le ray tracing. Plus la valeur est élevée plus le bruit sera réduit. Cela impacte énormement les performances.
 option.GI_SECONDARY_SAMPLES=Échantillons Secondaires GI
