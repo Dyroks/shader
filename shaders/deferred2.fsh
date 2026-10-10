@@ -380,6 +380,15 @@ const float RAY_TRACING_RADIUS = RAY_TRACING_DIAMETER / 2.0;
    vec2 n=f.xy-i.xy*.5;
    return n;
  }
+ #ifdef AB_GI_FIREFLY
+ // Firefly suppression: a new sample may not exceed a few times the accumulated value (rare rays
+ // hitting a small, very bright spot: sunlit patch, light block). Biases only those outliers.
+ vec3 GiClampFirefly(vec3 newValue,vec3 history)
+ {
+   float m=Luminance(history)*GI_FIREFLY_LIMIT+.01,n=Luminance(newValue);
+   return n>m?newValue*(m/n):newValue;
+ }
+ #endif
  void main()
  {
    vec4 y=vec4(0.);
@@ -419,6 +428,10 @@ const float RAY_TRACING_RADIUS = RAY_TRACING_DIAMETER / 2.0;
        if(S.w<.01||abs(g.x-0.5)>0.5-ScreenTexel.x||abs(g.y-0.5)>0.5-ScreenTexel.y||abs(e-F.yDFXZDbcEk)>.1)
          J=0.,k=.99,F.mwtAZpOIMX=0.;
        vec3 l=texture2DLod(colortex7,texcoord.xy+vec2(0.,HalfScreen.y),0).xyz;
+       #ifdef AB_GI_FIREFLY
+       if(J>0.)
+         l=GiClampFirefly(l,S.xyz);
+       #endif
        l=mix(l,S.xyz,vec3(J));
        k=max(k,mix(k,.9,saturate(-a.z*520.)));
        F.yDFXZDbcEk=e;
@@ -434,9 +447,21 @@ const float RAY_TRACING_RADIUS = RAY_TRACING_DIAMETER / 2.0;
    // follows the camera (scrolled copy).
    v.jbwXZaPXmq=D(irCachePos);
    if((((int(irCachePos.z)>>3)+frameCounter)&1)==0)
-     v.jbwXZaPXmq=mix(v.jbwXZaPXmq,c(irCachePos),vec3(.05));
+     {
+       vec3 cacheNew=c(irCachePos);
+       #ifdef AB_GI_FIREFLY
+       cacheNew=GiClampFirefly(cacheNew,v.jbwXZaPXmq);
+       #endif
+       v.jbwXZaPXmq=mix(v.jbwXZaPXmq,cacheNew,vec3(.05));
+     }
    #else
-   v.jbwXZaPXmq=mix(D(irCachePos),c(irCachePos),vec3(.025));
+   {
+     vec3 cacheOld=D(irCachePos),cacheNew=c(irCachePos);
+     #ifdef AB_GI_FIREFLY
+     cacheNew=GiClampFirefly(cacheNew,cacheOld);
+     #endif
+     v.jbwXZaPXmq=mix(cacheOld,cacheNew,vec3(.025));
+   }
    #endif
    v.KZGLOOTLva=c(texcoord.xy).KZGLOOTLva;
    gl_FragData[0]=vec4(y);

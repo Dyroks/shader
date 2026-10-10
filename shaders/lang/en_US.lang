@@ -398,3 +398,7 @@ option.AB_BLOOM=Lot 2: progressive bloom
 option.AB_BLOOM.comment=On: the bloom levels are combined by a chain of small passes, from the coarsest to the finest, and the final pass reads one level (8 samples per pixel instead of 72). Same look, a little smoother. Off: original bloom
 option.AB_FAR_SHADING=Lot 2: distant terrain shading
 option.AB_FAR_SHADING.comment=On: distant mountains (Voxy included) cast sun shadows found through the depth buffer (the occluder must be on screen), ambient occlusion reveals the relief beyond the GI range, no soft shadow lookups outside the shadow map. Off: original behaviour (no shadow beyond the shadow map, flat ambient light beyond the GI)
+option.AB_GI_FIREFLY=Lot 2: GI firefly suppression
+option.AB_GI_FIREFLY.comment=On: a new GI sample (per pixel and in the light cache) may not exceed a few times the accumulated value: fewer bright spots flickering on walls indoors (light through a window, torches). Off: no limit
+option.GI_FIREFLY_LIMIT=GI firefly limit
+option.GI_FIREFLY_LIMIT.comment=How many times the accumulated GI a new sample may reach. Lower = fewer flickering spots but slightly darker bounce light from small bright spots and slower reaction when a light appears

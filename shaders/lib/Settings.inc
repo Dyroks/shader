@@ -90,6 +90,8 @@
 #define AB_GI_CACHE // GI light cache: half of the cells traced per frame
 #define AB_BLOOM // Bloom: progressive upsampling chain, final pass reads one level
 #define AB_FAR_SHADING // Distant terrain: sun shadows through the depth buffer, ambient occlusion beyond the GI, no soft shadow lookups outside the shadow map
+#define AB_GI_FIREFLY // GI: firefly suppression (a new sample may not exceed GI_FIREFLY_LIMIT times the accumulated value)
+#define GI_FIREFLY_LIMIT 6.0 // [3.0 4.0 6.0 8.0 12.0 16.0]
 
 // Others
 // #define VISUALIZE_DANGEROUS_LIGHT_LEVEL

@@ -67,6 +67,7 @@ temporaire `AB_*` (écran *Comparaison du lot 2*), activée par défaut.
 | 2-B | `AB_GI_CACHE` | R2 : cache de lumière de la GI retracé par moitié | à tester |
 | 2-C | `AB_BLOOM` | R3 : bloom progressif ; R4 écarté | à tester |
 | 2-D | `AB_FAR_SHADING` | S7, V6, V7 : ombres et occlusion du relief lointain | à tester |
+| 2-E | `AB_GI_FIREFLY` | Anti-lucioles de la GI (retour du test : points lumineux qui clignotent en intérieur) | à tester |
 
 **2-A, faisceaux proches dans l'air** (`AirTerrainShadow.inc`, `Crepuscular.inc`, `composite4_c.csh`) :
 - Les anciens godrays (`composite4.fsh`) faisaient 32 pas sur 100 blocs pour chaque pixel interne, ciel compris,
@@ -112,6 +113,16 @@ poids selon la distance.
   85 lectures sauté).
 À vérifier en jeu : ombres des sommets sur les vallées lointaines au coucher du soleil, bruit ou faux ombrages
 (précision de la profondeur Voxy au loin), force de l'occlusion.
+
+**Retour du test du lot 2** : environ +5 FPS en extérieur, sans dégradation visible. En intérieur, des points
+lumineux apparaissent et disparaissent sur les murs (lumière d'une fenêtre, torches). Cause probable : des
+« lucioles », rayons de GI qui touchent rarement une petite zone très lumineuse, étalées par le débruiteur. Le cache
+retracé par moitié (2-B, poids double : mise à jour environ 1,4 fois plus bruitée) peut les aggraver.
+
+**2-E, anti-lucioles** (`deferred2.fsh`) : un nouvel échantillon, pour le pixel (accumulation temporelle, si
+l'historique est valide) comme pour le cache, ne peut pas dépasser `GI_FIREFLY_LIMIT` (6 par défaut) fois la
+luminance accumulée + 0,01. Seules les valeurs aberrantes sont biaisées ; une lumière qui apparaît met un peu plus
+longtemps à atteindre sa valeur (environ 1 s).
 
 ## Phase 9 : audit performance, lot 1
 
