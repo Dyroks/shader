@@ -242,6 +242,14 @@ const float RAY_TRACING_RADIUS = RAY_TRACING_DIAMETER / 2.0;
            vec3 stainedColor=vec3(1.);
            for(int Z=0;Z<DIFFUSE_TRACE_LENGTH;Z++)
              {
+               #ifdef AB_GI_VOLUME
+               if(S.QbpObHBdUl!=clamp(S.QbpObHBdUl,vec3(0.),vec3(RAY_TRACING_DIAMETER-1.)))
+                 {
+                   // left the voxel volume: escaped (sky)
+                   U=255.;
+                   break;
+                 }
+               #endif
                G=texelFetch(shadowcolor,d(S.QbpObHBdUl),0);
                U=G.w*255.;
                if(U<240.5)

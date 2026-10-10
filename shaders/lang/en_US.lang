@@ -385,3 +385,9 @@ option.HAZE_ALTITUDE=Valley Haze Altitude
 option.HAZE_ALTITUDE.comment=Altitude (Y) where the haze is the densest: set it to the bottom of your valleys. Below, the density stays the same.
 option.HAZE_HEIGHT=Valley Haze Thickness
 option.HAZE_HEIGHT.comment=Scale height in metres (scaled): the density is divided by 2.7 every this many metres above the haze altitude. Higher = the haze rises up the mountains.
+
+# Lot 1 A/B comparison (temporary)
+screen.Lot1=Lot 1 comparison (temporary)
+screen.Lot1.comment=Optimizations of lot 1, each switchable to compare before and after in game. Removed once validated
+option.AB_GI_VOLUME=Lot 1: GI inside the voxel volume
+option.AB_GI_VOLUME.comment=On: no GI tracing beyond the voxel volume (the sky ambient used there is stored directly), GI, light cache and reflection rays stop when they leave the volume, no voxel reflections for distant water, no denoising of the sky or of pixels beyond the volume, Voxy projection fixed in the denoiser. Off: original behaviour

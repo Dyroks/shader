@@ -23,6 +23,10 @@ in vec4 texcoord;
 
 const int shadowMapResolution = 8192; // Higher value impacts performance costs, but can get better shadow, and increase path tracing distance. Please increase the shadow distance at the same time. 4096 - 80 blocks path tracing. 8192 - 160 blocks path tracing. 16384 - 300 blocks path tracing, requires at least 6GB VRAM. 34768 - 530 blocks of path tracing, requires at least 20GB VRAM. [4096 8192 16384 32768]
 const float SHADOW_MAP_RESOLUTION = shadowMapResolution * MC_SHADOW_QUALITY;
+const float RAY_TRACING_RESOLUTION = SHADOW_MAP_RESOLUTION - 2048.0;
+const float RAY_TRACING_DIAMETER_TEMP = floor(pow(RAY_TRACING_RESOLUTION, 2.0 / 3.0));
+const float RAY_TRACING_DIAMETER = RAY_TRACING_DIAMETER_TEMP - mod(RAY_TRACING_DIAMETER_TEMP - 1.0, 2.0);
+const float RAY_TRACING_RADIUS = RAY_TRACING_DIAMETER / 2.0;
 
 vec3 WorldPosToShadowProjPosBias(vec3 worldPos, vec3 worldNormal)
 {
@@ -85,6 +89,13 @@ vec3 WorldPosToShadowProjPosBias(vec3 worldPos, vec3 worldNormal)
    {
      d=GetViewPosition(texcoord.xy,R).xyz;
    }
+   int taps=1;
+   #ifdef AB_GI_VOLUME
+   // sky or outside the voxel volume: no filtering (see PathTraceDenoiser.glsl), caustics still needed
+   vec3 worldPosC=mat3(gbufferModelViewInverse)*d+gbufferModelViewInverse[3].xyz;
+   if(R>=1.0||max(max(abs(worldPosC.x),abs(worldPosC.y)),abs(worldPosC.z))>RAY_TRACING_RADIUS)
+     taps=0;
+   #endif
    float o=-d.z;
    vec3 H=normalize(d);
    vec2 j=vec2(0.0);
@@ -99,7 +110,7 @@ vec3 WorldPosToShadowProjPosBias(vec3 worldPos, vec3 worldNormal)
    l*=saturate(dot(t,-H))*.8+.2;
    vec2 coordTemp=P*p*ScreenTexel;
    float luminaceH=Luminance(h.xyz);
-   for(int C=-1;C<=1;C++)
+   for(int C=-taps;C<=taps;C++)
      {
        vec2 B=texcoord.xy+vec2(C+j)*coordTemp;
        B=clamp(B,ScreenTexel*2.,HalfScreen-ScreenTexel*2.);

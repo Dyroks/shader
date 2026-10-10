@@ -382,3 +382,9 @@ option.HAZE_ALTITUDE=Altitude de la brume
 option.HAZE_ALTITUDE.comment=Altitude (Y) où la brume est la plus dense : réglez-la au fond de vos vallées. En dessous, la densité reste la même.
 option.HAZE_HEIGHT=Épaisseur de la brume
 option.HAZE_HEIGHT.comment=Hauteur d'échelle en mètres (× échelle) : la densité est divisée par 2,7 tous les X mètres au-dessus de l'altitude de la brume. Plus haut = la brume monte sur les montagnes.
+
+# Lot 1 A/B comparison (temporary)
+screen.Lot1=Comparaison du lot 1 (temporaire)
+screen.Lot1.comment=Optimisations du lot 1, chacune désactivable pour comparer avant et après en jeu. Supprimé une fois validé
+option.AB_GI_VOLUME=Lot 1 : GI dans le volume de voxels
+option.AB_GI_VOLUME.comment=Activé : pas de tracé de GI au-delà du volume de voxels (l'ambiance du ciel utilisée là-bas est écrite directement), les rayons de GI, du cache de lumière et des reflets s'arrêtent en sortant du volume, pas de reflets voxels pour l'eau lointaine, pas de débruitage du ciel ni des pixels hors du volume, projection Voxy corrigée dans le débruiteur. Désactivé : comportement d'origine

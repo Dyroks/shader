@@ -16,6 +16,7 @@ Base du pack : SEUS PTGI HRR 2.1 GFME, Iris 1.11.7, Minecraft 26.3, Voxy.
 | 6 | Accélération (révisée après mesures : saut hiérarchique des zones vides), intérieur et nuages proches | ✅ testée en jeu (meilleures performances, intérieur des nuages bon) |
 | 7 | Forme et éclairage des cumulus (retour : trop ronds, adoucis, blancs partout) : forme en chou-fleur, surface trouvée précisément, éclairage calibré sur une référence par path tracing, 2 bugs anciens corrigés | ✅ testée en jeu (« beaucoup mieux », assombrissement brusque sous la couche moyenne corrigé ensuite) |
 | 8 | Rayons crépusculaires : nouvelle carte d'ombre des nuages en espace lumière (2 cascades, ±80 km), ombre des nuages dans l'air intégrée avec l'atmosphère physique ; 8b : brume des vallées (milieu participant éclairé et ombré par les nuages) | 🧪 8 testée (rayons trop rares et trop faibles) → 8b testée (perte de FPS) → 8c testée (FPS en partie récupérés, bruit) → 8d à tester en jeu |
+| 9 | Audit performance, lot 1 : travail inutile supprimé sans changer l'image, bugs corrigés (voir la section Phase 9) | 🚧 en cours, chaque partie comparable en jeu (écran *Comparaison du lot 1*) |
 
 La bibliothèque de nuages simulés (prévue en phase 7) est écartée : formes figées et répétitives (décision de l'utilisateur).
 
@@ -53,6 +54,35 @@ Référence : 50-60 FPS à l'arrêt, environ 45 en mouvement, sans nuages.
 
 - **Test 3** : le fantôme sur les surfaces proches est corrigé. Les reflets au centre de l'écran fonctionnent à
   l'arrêt mais traînaient pendant les rotations : corrigé par la reprojection (à confirmer).
+
+## Phase 9 : audit performance, lot 1
+
+Audit complet : document « SEUS PTGI HRR — Audit performance et rendu » (Claude Docs,
+https://claude.ai/code/artifact/0f399351-52ed-4efa-8bd8-885217d65d0b). Le test de l'utilisateur confirme que la
+carte graphique limite. Lot 1 : supprimer le travail dont le résultat est jeté, sans changer l'image (sauf bugs).
+Chaque partie a une option temporaire `AB_*` (écran *Comparaison du lot 1*), activée par défaut, pour comparer en jeu ;
+ces options et l'ancien code seront retirés une fois validés.
+
+| Partie | Option | Contenu | État |
+|---|---|---|---|
+| 1-A | `AB_GI_VOLUME` | O1, O2, O7, O11, V2 : GI et reflets limités au volume de voxels | à tester |
+
+**1-A, GI dans le volume de voxels** (gain estimé 1,5 à 4 ms dans un panorama Voxy) :
+- O1 (`deferred.fsh`) : au-delà de `RAY_TRACING_RADIUS` (±167 blocs), `deferred12` remplace la GI par l'ambiance
+  du ciel (harmoniques sphériques × lumière du ciel + torches). `deferred` écrit directement cette ambiance au lieu de
+  tracer un rayon depuis le bord du volume ; `deferred.vsh` calcule les harmoniques comme `deferred12.vsh`. Le
+  débruiteur mélange donc la bande de transition vers la même valeur qu'avant le remplacement : image identique.
+- O2 (`deferred.fsh`, `deferred2.fsh`, `composite.fsh`) : un rayon qui sort du volume s'arrête et compte comme
+  échappé vers le ciel. Avant, les coordonnées étaient ramenées sur le bord : le rayon relisait les voxels du bord
+  jusqu'au 120e pas et pouvait y trouver un faux obstacle.
+- O7 (`composite.fsh`) : pas de tracé des reflets dans les voxels pour une surface hors du volume (eau lointaine,
+  eau Voxy) : seul le ciel est reflété, le tracé en espace écran reste. Avant, le départ était ramené sur le bord.
+- O11 (`PathTraceDenoiser.glsl`, `deferred11.fsh`) : pas de filtrage du ciel ni des pixels hors du volume
+  (`deferred11` calcule toujours les caustiques).
+- V2 (`PathTraceDenoiser.glsl`) : le centre des pixels Voxy était reconstruit avec la projection vanilla.
+
+À vérifier en jeu : FPS dans la vue de référence ; transition GI / ambiance vers 160-170 blocs ; GI des vallées
+profondes près du bord vertical du volume (les rayons qui sortent voient maintenant le ciel).
 
 ## Phase 8 : rayons crépusculaires
 

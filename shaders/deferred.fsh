@@ -22,6 +22,12 @@ flat in vec3 colorSkyUp;
 
 
 #include "/lib/Settings.inc"
+#ifdef AB_GI_VOLUME
+flat in vec3 colorTorchlight;
+flat in vec4 skySHR;
+flat in vec4 skySHG;
+flat in vec4 skySHB;
+#endif
 #include "/lib/Uniforms.inc"
 #include "/lib/Common.inc"
 
@@ -253,6 +259,14 @@ const float RAY_TRACING_RADIUS = RAY_TRACING_DIAMETER / 2.0;
        for(int u=0;u<DIFFUSE_TRACE_LENGTH;u++)
          {
            T.QbpObHBdUl+=T.frnQIYJjVJ*T.fgCeZiNBHZ;
+           #ifdef AB_GI_VOLUME
+           if(T.QbpObHBdUl!=clamp(T.QbpObHBdUl,vec3(0.),vec3(RAY_TRACING_DIAMETER-1.)))
+             {
+               // left the volume: escaped, as when the edge of the volume is empty
+               j=255.;
+               break;
+             }
+           #endif
            shadowCoord=ivec2(d(T.QbpObHBdUl));
            U=texelFetch(shadowcolor,shadowCoord,0);
            T.frnQIYJjVJ=step(T.ZKdJsVHIyK.xyz,vec3(min(T.ZKdJsVHIyK.x,min(T.ZKdJsVHIyK.y,T.ZKdJsVHIyK.z))));
@@ -400,6 +414,21 @@ const float RAY_TRACING_RADIUS = RAY_TRACING_DIAMETER / 2.0;
        }
        vec4 f=gbufferModelViewInverse*vec4(s.xyz,1.),n=gbufferModelViewInverse*vec4(s.xyz,0.);
        vec3 r=normalize(n.xyz),z=normalize((gbufferModelViewInverse*vec4(m.normal,0.)).xyz),e=normalize((gbufferModelViewInverse*vec4(m.geoNormal,0.)).xyz);
+       #ifdef AB_GI_VOLUME
+       // Outside the voxel volume deferred12 replaces the GI with the sky ambient (RAY_TRACING_RADIUS - 5
+       // to RAY_TRACING_RADIUS): store that ambient instead of tracing from the clamped edge of the volume,
+       // so the denoiser blends the transition band toward the same value.
+       if(x.sky<.5&&max(max(abs(f.x),abs(f.y)),abs(f.z))>RAY_TRACING_RADIUS)
+         {
+           vec3 y=z;
+           if(x.grass>.5)
+             y=vec3(0.,1.,0.);
+           vec3 F=FromSH(skySHR,skySHG,skySHB,y)*m.mcLightmap.y*4.5;
+           F+=m.mcLightmap.x*colorTorchlight*.0925;
+           i=vec4(F*.1,1.);
+         }
+       else
+       #endif
        i=c(f.xyz,s.xyz,z,e,r,x,m.mcLightmap.y,m.parallaxOffset);
      }
    gl_FragData[0]=texture2DLod(colortex1,texcoord.xy,0);

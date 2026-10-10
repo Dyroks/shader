@@ -85,6 +85,9 @@
 #define AA_STYLE 1 // [0 1]
 // #define SKIP_AA
 
+// Lot 1 A/B (temporary: compare the optimizations in game, then removed)
+#define AB_GI_VOLUME // Global illumination: no tracing outside the voxel volume (filled with the ambient light deferred12 uses there), rays stop when they leave the volume
+
 // Others
 // #define VISUALIZE_DANGEROUS_LIGHT_LEVEL
 #define SKYLIGHT_FIX

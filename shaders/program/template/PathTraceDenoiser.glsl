@@ -5,6 +5,15 @@ in vec4 texcoord;
 #include "/lib/Uniforms.inc"
 #include "/lib/Common.inc"
 
+#ifdef AB_GI_VOLUME
+const int shadowMapResolution = 8192; // Higher value impacts performance costs, but can get better shadow, and increase path tracing distance. Please increase the shadow distance at the same time. 4096 - 80 blocks path tracing. 8192 - 160 blocks path tracing. 16384 - 300 blocks path tracing, requires at least 6GB VRAM. 34768 - 530 blocks of path tracing, requires at least 20GB VRAM. [4096 8192 16384 32768]
+const float SHADOW_MAP_RESOLUTION = shadowMapResolution * MC_SHADOW_QUALITY;
+const float RAY_TRACING_RESOLUTION = SHADOW_MAP_RESOLUTION - 2048.0;
+const float RAY_TRACING_DIAMETER_TEMP = floor(pow(RAY_TRACING_RESOLUTION, 2.0 / 3.0));
+const float RAY_TRACING_DIAMETER = RAY_TRACING_DIAMETER_TEMP - mod(RAY_TRACING_DIAMETER_TEMP - 1.0, 2.0);
+const float RAY_TRACING_RADIUS = RAY_TRACING_DIAMETER / 2.0;
+#endif
+
 
  float i(vec2 v)
  {
@@ -39,15 +48,28 @@ in vec4 texcoord;
    GetBothNormals(f.xy,a,t);
    float R=GetDepth(f.xy);
    vec3 d;
+   bool sky=R>=1.0;
    #ifdef LOD
    if(R==1.0){
      float lodDepth=getLodDepthSolidDeferred(f.xy);
+     #ifdef AB_GI_VOLUME
+     sky=lodDepth>=1.0;
+     d=GetViewPositionLod(f.xy,lodDepth).xyz;
+     #else
      d=GetViewPosition(f.xy,lodDepth).xyz;
+     #endif
    }else
    #endif
    {
      d=GetViewPosition(f.xy,R).xyz;
    }
+   #ifdef AB_GI_VOLUME
+   // sky, or outside the voxel volume where deferred12 does not use the GI (it holds the smooth sky
+   // ambient written by deferred, so it needs no filtering to serve as a neighbour sample)
+   vec3 worldPos=mat3(gbufferModelViewInverse)*d+gbufferModelViewInverse[3].xyz;
+   if(sky||max(max(abs(worldPos.x),abs(worldPos.y)),abs(worldPos.z))>RAY_TRACING_RADIUS)
+     return e;
+   #endif
    float o=-d.z;
    vec3 H=normalize(d);
    vec2 j=vec2(0.0);

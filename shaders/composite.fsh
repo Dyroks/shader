@@ -300,9 +300,24 @@ vec2 Texcoord;
        vec2 shadowCoord=vec2(0.);
        float prevID=255.;
        vec3 rayHitPos=vec3(0.);
-       for(int j=0;j<REFLECTION_TRACE_LENGTH;j++)
+       int traceLength=REFLECTION_TRACE_LENGTH;
+       #ifdef AB_GI_VOLUME
+       // surface outside the voxel volume (distant or Voxy water): the trace would start from the clamped
+       // edge of the volume, so only the sky is reflected (screen space tracing above handles the terrain)
+       if(max(max(abs(s.x),abs(s.y)),abs(s.z))>RAY_TRACING_RADIUS-1.)
+         traceLength=0;
+       #endif
+       for(int j=0;j<traceLength;j++)
          {
            P.QbpObHBdUl+=P.frnQIYJjVJ*P.fgCeZiNBHZ;
+           #ifdef AB_GI_VOLUME
+           if(P.QbpObHBdUl!=clamp(P.QbpObHBdUl,vec3(0.),vec3(RAY_TRACING_DIAMETER-1.)))
+             {
+               // left the voxel volume: escaped (sky)
+               Y=vec4(1.);
+               break;
+             }
+           #endif
            shadowCoord=d(P.QbpObHBdUl);
            Y=texelFetch(shadowcolor,ivec2(shadowCoord),0);
            P.frnQIYJjVJ=step(P.ZKdJsVHIyK.xyz,vec3(min(P.ZKdJsVHIyK.x,min(P.ZKdJsVHIyK.y,P.ZKdJsVHIyK.z))));
