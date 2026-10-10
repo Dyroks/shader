@@ -142,7 +142,6 @@ vec3 WorldPosToShadowProjPos(vec3 worldPos)
            vec3 C=vec3(0.),Q=gbufferModelViewInverse[3].xyz;
            #if defined VOLUMETRIC_CLOUDS && defined CLOUD_SHADOWS
            CloudShadowFrame cloudShadowFrame=CloudShadowMakeFrame(worldLightVector);
-           vec2 cloudShadowJitter=BlueNoiseTemporal(texcoord.xy).yz-.5;
            #endif
            vec3 Temp=c.xyz*N;
            for(int M=0;M<32;M++)
@@ -168,7 +167,7 @@ vec3 WorldPosToShadowProjPos(vec3 worldPos)
                  }
                #endif
                #if defined VOLUMETRIC_CLOUDS && defined CLOUD_SHADOWS
-               Z*=CloudShadowTransmittance(CloudShadowOpticalDepth(cloudShadowFrame,W.xyz,cloudShadowJitter,true));
+               Z*=CloudShadowTransmittance(CloudShadowOpticalDepth(cloudShadowFrame,W.xyz));
                #endif
                if(eyeInWater)
                  {

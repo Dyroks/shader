@@ -498,9 +498,29 @@ def main():
         Image.fromarray((y[::-1] * 255).astype(np.uint8)).save(args.out)
         return
     # cloud shadow map, sky capture (4 frames to fill every texel of the checkerboard)
-    common_uniforms(pShadow, 0)
-    shadowMap.bind_to_image(0, read=False, write=True)
-    run(pShadow, 48, 32)
+    # time sliced: 4 frames fill every row of both cascades
+    for f in range(4):
+        common_uniforms(pShadow, f)
+        shadowMap.bind_to_image(0, read=False, write=True)
+        run(pShadow, 48, 32)
+    if os.environ.get("SHADOW_MOVE"):
+        # test of the toroidal addressing: the camera moves (x z blocks), one more frame only
+        dx, dz = (float(v) for v in os.environ["SHADOW_MOVE"].split(","))
+        cam = (cam[0] + dx, cam[1], cam[2] + dz)
+        # the weather maps follow the camera every frame in game
+        common_uniforms(pRegime, 0)
+        regime.bind_to_image(0, read=False, write=True)
+        run(pRegime, 32, 32)
+        for p, img, size in ((pBeginN, wNear, 2048), (pBeginF, wFar, 1024)):
+            common_uniforms(p, 0)
+            img.bind_to_image(0, read=False, write=True)
+            run(p, size // 16, size // 16)
+        common_uniforms(pSkip, 0)
+        skipMap.bind_to_image(0, read=False, write=True)
+        run(pSkip, 16, 16)
+        common_uniforms(pShadow, 4)
+        shadowMap.bind_to_image(0, read=False, write=True)
+        run(pShadow, 48, 32)
     if os.environ.get("CLOUD_TIMING"):  # second dispatch: the first one includes the compilation
         import time as _t
         ctx.finish(); _t0 = _t.perf_counter(); run(pShadow, 48, 32); ctx.finish()

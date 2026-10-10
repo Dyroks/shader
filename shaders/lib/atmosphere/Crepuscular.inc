@@ -51,7 +51,7 @@ struct AirLight {
 
 // dir: normalised view direction, dist: distance to the first surface (blocks, 1e9 for the sky),
 // cloudTD: transmittance and distance (blocks) of the clouds seen through the pixel,
-// noise: three values in [0, 1), different every frame, skyAmbient: average sky radiance,
+// noise: x = step jitter in [0, 1), different every frame, skyAmbient: average sky radiance,
 // apFade: fade of the aerial perspective with the sky light at the eye (caves).
 // removed and inscatter are in deferred12 sky units.
 AirLight AirLightIntegrate(vec3 dir, float dist, vec2 cloudTD, vec3 noise, vec3 skyAmbient, float apFade) {
@@ -117,8 +117,8 @@ AirLight AirLightIntegrate(vec3 dir, float dist, vec2 cloudTD, vec3 noise, vec3 
 
 	// quadratic distribution (shafts close to the camera are the largest on screen), one jitter
 	// for all the steps (stratified), filtered by the temporal anti-aliasing
-	// fewer steps over short segments (close terrain): 8 below ~3 km, all of them from 30 km
-	int N = clamp(int(ceil(float(CREPUSCULAR_STEPS) * sqrt((t1 - t0) * atmoKmPerBlock / 30.0))), min(8, CREPUSCULAR_STEPS), CREPUSCULAR_STEPS);
+	// fewer steps over short segments (close terrain): 12 below ~7 km, all of them from 30 km
+	int N = clamp(int(ceil(float(CREPUSCULAR_STEPS) * sqrt((t1 - t0) * atmoKmPerBlock / 30.0))), min(12, CREPUSCULAR_STEPS), CREPUSCULAR_STEPS);
 	for (int i = 0; i < N; i++) {
 		float a0 = float(i) / float(N), a1 = float(i + 1) / float(N);
 		float ta = t0 + (t1 - t0) * a0 * a0, tb = t0 + (t1 - t0) * a1 * a1;
@@ -147,7 +147,7 @@ AirLight AirLightIntegrate(vec3 dir, float dist, vec2 cloudTD, vec3 noise, vec3 
 		if (lit) {
 			sunL = AtmoLightAt(P, r, L);
 			#ifdef CREPUSCULAR_ACTIVE
-				vec2 odv = CloudShadowOpticalDepthSplit(frame, dir * t, noise.yz - 0.5);
+				vec2 odv = CloudShadowOpticalDepthSplit(frame, dir * t);
 				float od = odv.x + odv.y;
 				float direct = exp(-od);
 				// the strength exaggerates the shadows of the low clouds (the shafts) only

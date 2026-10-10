@@ -28,9 +28,10 @@ void main() {
 		ivec2 id = ivec2(gl_GlobalInvocationID.xy);
 		bool far = id.x >= int(cloudShadowNearSize);
 		if (!far && id.y >= int(cloudShadowNearSize)) return;
-		// the far cascade is refreshed every other frame (one row out of two): far shadows
-		// move slowly, the stale rows are at most one frame old
-		if (far && ((id.y ^ frameCounter) & 1) != 0) return;
+		// Time sliced: the near cascade refreshes one row in two per frame, the far one one row
+		// in four (toroidal addressing, CloudSky.inc: a stale row still holds the right world
+		// column, at most 1 or 3 frames old; shadows move slowly)
+		if (far ? ((id.y + frameCounter) & 3) != 0 : ((id.y ^ frameCounter) & 1) != 0) return;
 		vec3 L = normalize(shadowModelViewInverse[2].xyz);
 		vec4 res = vec4(0.0);
 
@@ -39,8 +40,12 @@ void main() {
 			vec3 U, V;
 			CloudShadowBasis(L, U, V);
 			float texel = far ? cloudShadowTexelFar : cloudShadowTexelNear;
-			float size = far ? cloudShadowFarSize : cloudShadowNearSize;
-			vec2 uv = CloudShadowGridOffset(U, V, texel) + (vec2(far ? id.x - int(cloudShadowNearSize) : id.x, id.y) + 0.5 - size * 0.5) * texel;
+			int size = far ? int(cloudShadowFarSize) : int(cloudShadowNearSize);
+			// window texel held by this atlas texel, then its centre relative to the camera
+			vec2 cam = CloudShadowCamTexels(U, V, texel);
+			ivec2 org = ivec2(floor(cam)) - size / 2;
+			ivec2 w = (ivec2(far ? id.x - int(cloudShadowNearSize) : id.x, id.y) - org) & (size - 1);
+			vec2 uv = (vec2(w) + 0.5 - float(size / 2) - fract(cam)) * texel;
 			vec3 q = U * uv.x + V * uv.y;   // texel centre on the plane through the camera, normal to L
 			float camY = cameraPosition.y;
 

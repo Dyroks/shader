@@ -55,7 +55,9 @@ void main() {
 		vec2 cloudTD = vec2(1.0, 1e9);
 		if (CloudPossible(dir, dist)) cloudTD = vec2(CloudSat(CloudHistory(px, true).z), CloudDepthAt(px));
 
-		vec3 noise = texelFetch(noisetex, px & 63, 0).rgb;
+		// blue noise over the low resolution grid (sampling it one pixel in two would lose its
+		// blue spectrum: clumped noise the temporal anti-aliasing cannot remove)
+		vec3 noise = texelFetch(noisetex, rp & 63, 0).rgb;
 		noise = fract(noise + vec3(0.447213595, 1.41421356, 1.61803398) * float(frameCounter % 64));
 		float apFade = pow(CloudSat(float(eyeBrightnessSmooth.y) / 240.0), 6.0);
 		// only used when neither the sun nor the moon is above the horizon

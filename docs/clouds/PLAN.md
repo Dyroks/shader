@@ -15,7 +15,7 @@ Base du pack : SEUS PTGI HRR 2.1 GFME, Iris 1.11.7, Minecraft 26.3, Voxy.
 | 5 | Variété : couches moyennes et hautes (Ac, As, Ci, Cs, Cc), cumulonimbus et enclume, régimes météo, éclairs | ✅ testée en jeu (« très bon », pas de problème) |
 | 6 | Accélération (révisée après mesures : saut hiérarchique des zones vides), intérieur et nuages proches | ✅ testée en jeu (meilleures performances, intérieur des nuages bon) |
 | 7 | Forme et éclairage des cumulus (retour : trop ronds, adoucis, blancs partout) : forme en chou-fleur, surface trouvée précisément, éclairage calibré sur une référence par path tracing, 2 bugs anciens corrigés | ✅ testée en jeu (« beaucoup mieux », assombrissement brusque sous la couche moyenne corrigé ensuite) |
-| 8 | Rayons crépusculaires : nouvelle carte d'ombre des nuages en espace lumière (2 cascades, ±80 km), ombre des nuages dans l'air intégrée avec l'atmosphère physique ; 8b : brume des vallées (milieu participant éclairé et ombré par les nuages) | 🧪 8 testée (rayons trop rares et trop faibles) → 8b testée (perte de FPS) → 8c (optimisation) à tester en jeu |
+| 8 | Rayons crépusculaires : nouvelle carte d'ombre des nuages en espace lumière (2 cascades, ±80 km), ombre des nuages dans l'air intégrée avec l'atmosphère physique ; 8b : brume des vallées (milieu participant éclairé et ombré par les nuages) | 🧪 8 testée (rayons trop rares et trop faibles) → 8b testée (perte de FPS) → 8c testée (FPS en partie récupérés, bruit) → 8d à tester en jeu |
 
 La bibliothèque de nuages simulés (prévue en phase 7) est écartée : formes figées et répétitives (décision de l'utilisateur).
 
@@ -107,6 +107,13 @@ Mesures hors jeu (rapports seulement), puis trois corrections :
 | Rayons + brume intégrés pour **chaque pixel interne** dans `composite4` (24 pas), soit 4 × les pixels de la marche des nuages | Nouvelle passe `composite4_c` à la résolution de la marche (un pixel de chaque bloc 2×2, un différent à chaque image, comme `CLOUD_RES` 2), 2 images (`airLightA/B`). `composite4` suréchantillonne (4 voisins, poids bilinéaires × similarité de la distance de la surface) et n'intègre lui-même que les pixels sans voisin de profondeur proche (bords fins contre le ciel : < 1 % des pixels). Moins de pas sur les trajets courts (8 sous ~3 km). Coût de l'air ≈ ÷ 3. |
 | `CloudShadowLookup` (lumière du soleil sur le relief, **chaque impact de rayon de la GI** dans `deferred2`, réflexions) : la nouvelle carte faisait 4 lectures, 4 exponentielles et un logarithme au lieu d'une lecture filtrée | Sous la couche de nuages (cas du relief et de la GI), une seule lecture filtrée par le matériel (profondeur optique totale du texel), comme avant la phase 8. |
 | Carte d'ombre : la cascade proche (512²) traversait 5 à 8 km de champ de cumulus par texel en petits sauts (31 itérations sur 35 hors des nuages : le champ de distance est plafonné à ~0,7 km ; la carte de saut hiérarchique n'aide pas, ses tuiles contiennent presque toutes un nuage) | Cascade proche réduite à 256² (±8 km, même finesse de 62,5 m) ; au-delà, la cascade lointaine (312 m). Coût ≈ ÷ 1,7. |
+
+Second retour : FPS en partie récupérés, mais impact encore sensible, et **bruit sur les rayons** (bords granuleux).
+
+| Problème | Correction (8d) |
+|---|---|
+| Bruit : la lecture de la carte d'ombre était stochastique (± ½ texel, filtrée par le TAA). À la résolution de la marche, ce bruit devient des grains 2×2 que le TAA ne retire plus ; le bruit bleu était en plus lu un pixel sur deux (spectre perdu) | Lecture filtrée par le matériel (bilinéaire des 4 canaux sMax, sMin, profondeurs optiques : ombres lisses, aucun bruit) pour l'air, les rayons du pack, le relief et la GI ; bruit bleu sur la grille basse résolution ; 12 pas minimum. |
+| Carte d'ombre recalculée entièrement à chaque image | **Adressage torique** : un texel garde toujours la même colonne du monde (indice mod taille), donc une ligne non rafraîchie reste juste quand la caméra bouge (vérifié hors jeu : caméra déplacée de 175 m avec les lignes anciennes, écart < 0,01 % des pixels). Cascade proche : une ligne sur deux par image ; lointaine : une sur quatre. Marge de 3 texels au bord de la fenêtre proche (colonnes nouvelles pas encore calculées). |
 
 Réglages conseillés pour une carte de montagne : *Altitude de la brume* = fond des vallées, *Brume des vallées*
 Marquée ou Dense, *Épaisseur* 800 à 1000 m (elle monte sur les versants), *Intensité des rayons* 150 à 300 %.
