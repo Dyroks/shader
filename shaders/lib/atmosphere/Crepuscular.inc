@@ -30,7 +30,7 @@
 	#define HAZE_ACTIVE
 #endif
 
-#if defined CREPUSCULAR_ACTIVE || defined HAZE_ACTIVE
+#if defined CREPUSCULAR_ACTIVE || defined HAZE_ACTIVE || defined AIR_TERRAIN_SHADOW
 #define AIR_LIGHT_ACTIVE
 
 #ifdef HAZE_ACTIVE
@@ -101,6 +101,7 @@ AirLight AirLightIntegrate(vec3 dir, float dist, vec2 cloudTD, vec3 noise, vec3 
 	// sums in front of the clouds (F) and behind them (B), per unit light irradiance (amb: per
 	// unit ambient radiance)
 	vec3 remF = vec3(0.0), remB = vec3(0.0), sunF = vec3(0.0), sunB = vec3(0.0), ambF = vec3(0.0), ambB = vec3(0.0);
+	vec3 mistF = vec3(0.0), mistB = vec3(0.0);   // near mist (AirTerrainShadow.inc)
 	// Ta: transmittance of the air (already applied to the scene by the sky and the aerial
 	// perspective), Th: of the haze (applied here)
 	vec3 Ta = vec3(1.0), Th = vec3(1.0), Thcloud = vec3(1.0);
@@ -118,10 +119,28 @@ AirLight AirLightIntegrate(vec3 dir, float dist, vec2 cloudTD, vec3 noise, vec3 
 	// quadratic distribution (shafts close to the camera are the largest on screen), one jitter
 	// for all the steps (stratified), filtered by the temporal anti-aliasing
 	// fewer steps over short segments (close terrain): 12 below ~7 km, all of them from 30 km
-	int N = clamp(int(ceil(float(CREPUSCULAR_STEPS) * sqrt((t1 - t0) * atmoKmPerBlock / 30.0))), min(12, CREPUSCULAR_STEPS), CREPUSCULAR_STEPS);
-	for (int i = 0; i < N; i++) {
-		float a0 = float(i) / float(N), a1 = float(i + 1) / float(N);
-		float ta = t0 + (t1 - t0) * a0 * a0, tb = t0 + (t1 - t0) * a1 * a1;
+	// near segment (camera in the lower air): the first blocks get samples of their own, with
+	// the shadow of the terrain and the near mist
+	float tn = t0;
+	int M = 0;
+	#ifdef AIR_TERRAIN_SHADOW
+		if (t0 == 0.0 && lit) {
+			tn = min(t1, shadowDistance);
+			M = airNearSteps;
+		}
+		float mistPhase = AirMistPhase(c);
+	#endif
+	int N = t1 > tn ? clamp(int(ceil(float(CREPUSCULAR_STEPS) * sqrt((t1 - tn) * atmoKmPerBlock / 30.0))), min(12, CREPUSCULAR_STEPS), CREPUSCULAR_STEPS) : 0;
+	for (int i = 0; i < M + N; i++) {
+		bool near = i < M;
+		float ta, tb;
+		if (near) {
+			float a0 = float(i) / float(M), a1 = float(i + 1) / float(M);
+			ta = tn * a0 * a0; tb = tn * a1 * a1;
+		} else {
+			float a0 = float(i - M) / float(N), a1 = float(i - M + 1) / float(N);
+			ta = tn + (t1 - tn) * a0 * a0; tb = tn + (t1 - tn) * a1 * a1;
+		}
 		float t = mix(ta, tb, noise.x);
 		float dtKm = (tb - ta) * atmoKmPerBlock;
 		vec3 P = ro + dir * (t * atmoKmPerBlock);
@@ -143,9 +162,13 @@ AirLight AirLightIntegrate(vec3 dir, float dist, vec2 cloudTD, vec3 noise, vec3 
 		// through the clouds; multiple scattering: the radiance field of the sky and the ground
 		// (isotropic, Hillaire's multiple scattering LUT)
 		float dirEff = 1.0, difEff = 0.0;
-		vec3 sunL = vec3(0.0), ms = vec3(0.0);
+		vec3 sunL = vec3(0.0), ms = vec3(0.0), sunV = vec3(0.0);
 		if (lit) {
 			sunL = AtmoLightAt(P, r, L);
+			sunV = sunL;   // past the terrain
+			#ifdef AIR_TERRAIN_SHADOW
+				if (near) sunV *= AirTerrainVisibility(dir * t);
+			#endif
 			#ifdef CREPUSCULAR_ACTIVE
 				vec2 odv = CloudShadowOpticalDepthSplit(frame, dir * t);
 				float od = odv.x + odv.y;
@@ -162,17 +185,29 @@ AirLight AirLightIntegrate(vec3 dir, float dist, vec2 cloudTD, vec3 noise, vec3 
 			// integrated it (lit, without haze), added back shadowed and behind the haze
 			if (lit) ms = AtmoMultiScat(r, dot(P, L) / r);
 			vec3 air0 = (sunL * airSun + ms * airIso) * wa;
-			vec3 air1 = (sunL * (airSun * dirEff + airIso * (difEff * 0.25 / atmoPI)) + ms * airIso) * wh;
+			vec3 air1 = (sunV * (airSun * dirEff + airIso * (difEff * 0.25 / atmoPI)) + ms * airIso) * wh;
 			// haze: sunlight through the haze above the point (vertical column / sun elevation)
 			float column = max(-hRel, 0.0) + hazeH * exp(-max(hRel, 0.0) / hazeH);
-			vec3 sunH = sunL * exp(-hazeSig * hazeSpectral * (column / muL));
+			vec3 sunH = sunV * exp(-hazeSig * hazeSpectral * (column / muL));
 			vec3 scat = hazeExt * hazeAlbedo * wh;
 			vec3 add = air1 + scat * (sunH * (phaseH * dirEff + difEff * 0.25 / atmoPI + groundSun * dirEff) + ms);
 			if (front) { remF += air0; sunF += add; ambF += scat; } else { remB += air0; sunB += add; ambB += scat; }
 		#else
 			// only the light the shadowed air does not scatter is removed
-			vec3 rem = sunL * (airSun * (1.0 - dirEff) - airIso * (difEff * 0.25 / atmoPI)) * wa;
+			vec3 rem = (sunL * airSun - sunV * (airSun * dirEff + airIso * (difEff * 0.25 / atmoPI))) * wa;
 			if (front) remF += rem; else remB += rem;
+		#endif
+		#ifdef AIR_TERRAIN_SHADOW
+			if (near) {
+				// thin near mist (no extinction), fading out toward the end of the shadow map
+				float mistOD = airMistSigma * (1.0 - smoothstep(0.5 * shadowDistance, shadowDistance, t)) * (tb - ta);
+				#ifdef HAZE_ACTIVE
+					vec3 mist = sunV * (mistPhase * dirEff + difEff * 0.25 / atmoPI) * (mistOD * Ta * Th);
+				#else
+					vec3 mist = sunV * (mistPhase * dirEff + difEff * 0.25 / atmoPI) * (mistOD * Ta);
+				#endif
+				if (front) mistF += mist; else mistB += mist;
+			}
 		#endif
 
 		Ta *= sampleTa;
@@ -185,10 +220,11 @@ AirLight AirLightIntegrate(vec3 dir, float dist, vec2 cloudTD, vec3 noise, vec3 
 	float Tc = cloudTD.x;
 	vec3 sunUnit = atmoSunColor * (atmoUnit * lightScale);
 	res.removed = (remF + remB * Tc) * sunUnit;
+	res.inscatter = (mistF + mistB * Tc) * sunUnit;
 	#ifdef HAZE_ACTIVE
 		// no light above the horizon: the average sky radiance
 		vec3 ambient = lit ? vec3(0.0) : skyAmbient * (0.5 + 0.5 * hazeGroundAlbedo);
-		res.inscatter = (sunF + sunB * Tc) * sunUnit + (ambF + ambB * Tc) * ambient;
+		res.inscatter += (sunF + sunB * Tc) * sunUnit + (ambF + ambB * Tc) * ambient;
 		// clouds: only the haze in front of them; the background: all of it
 		res.T = mix(Thcloud, Th, Tc);
 	#endif

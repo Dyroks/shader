@@ -167,12 +167,12 @@ value.CLOUD_DEBUG_VIEW.2=Weather Map
 value.CLOUD_DEBUG_VIEW.3=Cost
 value.CLOUD_DEBUG_VIEW.4=Transmittance
 
-option.GODRAYS=Atmospheric Godrays
-option.GODRAYS.comment=Enables volumetric lighting from sunlight (aka "Godrays") while not underwater
-option.GODRAYS_STAINED_GLASS_TINT=Godrays Stained Glass Tint
-option.GODRAYS_STAINED_GLASS_TINT.comment=Enables stained tint for godray color
-option.VOLUMETRIC_LIGHT_STRENGTH=Godrays Strength
-option.VOLUMETRIC_LIGHT_STRENGTH.comment=Strength of godrays, affects underwater godrays too
+option.GODRAYS=Near Light Shafts
+option.GODRAYS.comment=A thin mist near the camera, lit by the sun and shadowed by the terrain: shafts through leaves, windows and ridges; the air and the valley haze in the shade of the terrain stay dark. With the physical atmosphere and volumetric clouds it is computed with the light of the air (cheaper); otherwise the original godrays. Underwater: underwater shafts
+option.GODRAYS_STAINED_GLASS_TINT=Stained Glass Tint
+option.GODRAYS_STAINED_GLASS_TINT.comment=Light through stained glass colours the shafts
+option.VOLUMETRIC_LIGHT_STRENGTH=Near Light Shafts Strength
+option.VOLUMETRIC_LIGHT_STRENGTH.comment=Density of the near mist (1.0: fully lit, it brightens the view by about 5 % at noon and 14 % at sunset). Also affects the underwater shafts
 
 # Shadow
 option.shadowDistance=Shadow Distance
@@ -386,3 +386,9 @@ option.HAZE_ALTITUDE.comment=Altitude (Y) where the haze is the densest: set it 
 option.HAZE_HEIGHT=Valley Haze Thickness
 option.HAZE_HEIGHT.comment=Scale height in metres (scaled): the density is divided by 2.7 every this many metres above the haze altitude. Higher = the haze rises up the mountains.
 
+
+# Lot 2 A/B comparison (temporary)
+screen.Lot2=Lot 2 comparison (temporary)
+screen.Lot2.comment=Changes of lot 2, each switchable to compare before and after in game. Removed once validated
+option.AB_AIR_SHAFTS=Lot 2: near shafts from the air
+option.AB_AIR_SHAFTS.comment=On: near light shafts computed with the light of the air (a quarter of the pixels): thin mist and valley haze shadowed by the terrain, stained glass tint. Off: original godrays (32 steps per pixel, added on top)

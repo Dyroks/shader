@@ -126,6 +126,7 @@ vec3 SkyAmbient() {
 #include "/lib/clouds/CloudComposite.inc"
 #if ATMOSPHERE_MODEL == 1
 #define AIR_LIGHT_UPSAMPLE
+#include "/lib/atmosphere/AirTerrainShadow.inc"
 #include "/lib/atmosphere/Crepuscular.inc"
 #endif
 uniform sampler2D noisetex;
@@ -386,7 +387,8 @@ def main():
     depthtex.filter = (moderngl.NEAREST, moderngl.NEAREST)
 
     # ---- programs ----------------------------------------------------------------------
-    extra = (["CLOUD_PROFILE"] if os.environ.get("PROF") else []) + [d.replace("=", " ", 1) for d in args.D]
+    # CLOUD_PREVIEW: no shadow map (AirTerrainShadow.inc: the near mist is lit everywhere)
+    extra = ["CLOUD_PREVIEW"] + (["CLOUD_PROFILE"] if os.environ.get("PROF") else []) + [d.replace("=", " ", 1) for d in args.D]
 
     def program(path):
         return ctx.compute_shader(build_source(os.path.join(SHADERS, path), overrides, extra))

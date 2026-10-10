@@ -167,12 +167,12 @@ value.CLOUD_DEBUG_VIEW.2=Carte météo
 value.CLOUD_DEBUG_VIEW.3=Coût
 value.CLOUD_DEBUG_VIEW.4=Transmittance
 
-option.GODRAYS=Rayons Crépusculaires
-option.GODRAYS.comment=Rendu de rayons crépusculaires depuis le soleil quand le joueur est hors de l'eau.
-option.GODRAYS_STAINED_GLASS_TINT=Rayons Colorés Teinture Verre
-option.GODRAYS_STAINED_GLASS_TINT.comment=Prend en compte la couleur du verre pour colorer le rayon de lumière.
-option.VOLUMETRIC_LIGHT_STRENGTH=Intensités Rayons
-option.VOLUMETRIC_LIGHT_STRENGTH.comment=Intensité des rayons. Affecte aussi les rayons sous l'eau.
+option.GODRAYS=Faisceaux proches
+option.GODRAYS.comment=Brume fine près de la caméra, éclairée par le soleil et ombrée par le terrain : faisceaux à travers les feuillages, les fenêtres et les crêtes ; l'air et la brume des vallées à l'ombre du relief restent sombres. Avec l'atmosphère physique et les nuages volumétriques, calculée avec la lumière de l'air (moins cher) ; sinon, anciens rayons du pack. Sous l'eau : rayons sous-marins
+option.GODRAYS_STAINED_GLASS_TINT=Teinte des vitraux
+option.GODRAYS_STAINED_GLASS_TINT.comment=La lumière qui traverse un vitrail colore les faisceaux
+option.VOLUMETRIC_LIGHT_STRENGTH=Intensité des faisceaux proches
+option.VOLUMETRIC_LIGHT_STRENGTH.comment=Densité de la brume proche (1,0 : entièrement éclairée, elle éclaircit la vue d'environ 5 % à midi et 14 % au coucher du soleil). Affecte aussi les rayons sous l'eau
 
 # Shadow
 option.shadowDistance=Distance des ombres
@@ -383,3 +383,9 @@ option.HAZE_ALTITUDE.comment=Altitude (Y) où la brume est la plus dense : régl
 option.HAZE_HEIGHT=Épaisseur de la brume
 option.HAZE_HEIGHT.comment=Hauteur d'échelle en mètres (× échelle) : la densité est divisée par 2,7 tous les X mètres au-dessus de l'altitude de la brume. Plus haut = la brume monte sur les montagnes.
 
+
+# Lot 2 A/B comparison (temporary)
+screen.Lot2=Comparaison du lot 2 (temporaire)
+screen.Lot2.comment=Changements du lot 2, chacun désactivable pour comparer avant et après en jeu. Supprimé une fois validé
+option.AB_AIR_SHAFTS=Lot 2 : faisceaux proches dans l'air
+option.AB_AIR_SHAFTS.comment=Activé : faisceaux proches calculés avec la lumière de l'air (un quart des pixels) : brume fine et brume des vallées ombrées par le terrain, teinte des vitraux. Désactivé : anciens godrays (32 pas par pixel, ajoutés par-dessus)

@@ -1,6 +1,7 @@
 #version 430
 
-// Light in the lower air (crepuscular rays and the valley haze, lib/atmosphere/Crepuscular.inc)
+// Light in the lower air (crepuscular rays, valley haze, terrain shadow and near mist:
+// lib/atmosphere/Crepuscular.inc, AirTerrainShadow.inc)
 // at the resolution of the cloud ray march: one pixel of each 2x2 block of internal pixels,
 // a different one every frame (the same as the march with CLOUD_RES 2). composite4 upsamples
 // it with depth aware weights, the temporal anti-aliasing filters the rest. The light in the
@@ -12,7 +13,7 @@ layout(local_size_x = 8, local_size_y = 8) in;
 
 #include "/lib/Settings.inc"
 
-#if defined VOLUMETRIC_CLOUDS && ATMOSPHERE_MODEL == 1 && (defined CREPUSCULAR_RAYS && defined CLOUD_SHADOWS || HAZE_DENSITY > 0)
+#if defined VOLUMETRIC_CLOUDS && ATMOSPHERE_MODEL == 1 && (defined CREPUSCULAR_RAYS && defined CLOUD_SHADOWS || HAZE_DENSITY > 0 || defined GODRAYS)
 	#define AIR_LIGHT_PASS
 const vec2 workGroupsRender = vec2(0.25, 0.25);
 #else
@@ -32,6 +33,18 @@ const ivec3 workGroups = ivec3(1, 1, 1);
 	#include "/lib/clouds/CloudSky.inc"
 	#include "/lib/clouds/CloudView.inc"
 	#include "/lib/clouds/CloudHistory.inc"
+	#ifndef MC_SHADOW_QUALITY
+		#define MC_SHADOW_QUALITY 1.0
+	#endif
+	#ifndef CLOUD_PREVIEW
+		uniform mat4 shadowModelView;
+		uniform mat4 shadowProjection;
+		uniform sampler2DShadow shadowtex0;
+		uniform sampler2D shadowcolor;
+		const int shadowMapResolution = 8192; // Higher value impacts performance costs, but can get better shadow, and increase path tracing distance. Please increase the shadow distance at the same time. 4096 - 80 blocks path tracing. 8192 - 160 blocks path tracing. 16384 - 300 blocks path tracing, requires at least 6GB VRAM. 34768 - 530 blocks of path tracing, requires at least 20GB VRAM. [4096 8192 16384 32768]
+		const float SHADOW_MAP_RESOLUTION = shadowMapResolution * MC_SHADOW_QUALITY;
+	#endif
+	#include "/lib/atmosphere/AirTerrainShadow.inc"
 	#include "/lib/atmosphere/Crepuscular.inc"
 
 	layout(rgba16f) uniform writeonly image2D airLightA;

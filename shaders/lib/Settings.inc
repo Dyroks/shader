@@ -85,6 +85,9 @@
 #define AA_STYLE 1 // [0 1]
 // #define SKIP_AA
 
+// Lot 2 A/B (temporary: compare in game, then removed)
+#define AB_AIR_SHAFTS // Near light shafts from the air light (terrain shadow, near mist) instead of the old godrays
+
 // Others
 // #define VISUALIZE_DANGEROUS_LIGHT_LEVEL
 #define SKYLIGHT_FIX

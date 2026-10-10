@@ -26,19 +26,20 @@ flat in vec3 colorSkyUp;
 #include "/lib/GBufferData.inc"
 #include "/lib/Materials.inc"
 
+const int shadowMapResolution = 8192; // Higher value impacts performance costs, but can get better shadow, and increase path tracing distance. Please increase the shadow distance at the same time. 4096 - 80 blocks path tracing. 8192 - 160 blocks path tracing. 16384 - 300 blocks path tracing, requires at least 6GB VRAM. 34768 - 530 blocks of path tracing, requires at least 20GB VRAM. [4096 8192 16384 32768]
+const float SHADOW_MAP_RESOLUTION = shadowMapResolution * MC_SHADOW_QUALITY;
+
 #ifdef VOLUMETRIC_CLOUDS
 flat in vec3 cloudSkyAmbient;
 #include "/lib/clouds/CloudLookups.inc"
 #include "/lib/clouds/CloudComposite.inc"
 #if ATMOSPHERE_MODEL == 1
 #define AIR_LIGHT_UPSAMPLE
+#include "/lib/atmosphere/AirTerrainShadow.inc"
 #include "/lib/atmosphere/Crepuscular.inc"
 #endif
 #endif
 
-
-const int shadowMapResolution = 8192; // Higher value impacts performance costs, but can get better shadow, and increase path tracing distance. Please increase the shadow distance at the same time. 4096 - 80 blocks path tracing. 8192 - 160 blocks path tracing. 16384 - 300 blocks path tracing, requires at least 6GB VRAM. 34768 - 530 blocks of path tracing, requires at least 20GB VRAM. [4096 8192 16384 32768]
-const float SHADOW_MAP_RESOLUTION = shadowMapResolution * MC_SHADOW_QUALITY;
 
 
 vec3 WorldPosToShadowProjPos(vec3 worldPos)
@@ -138,9 +139,10 @@ vec3 WorldPosToShadowProjPos(vec3 worldPos)
    vec3 vlAdd=vec3(0.);
    if(wetness<.99)
      {
-       #ifdef GODRAYS
+       #if defined GODRAYS && !defined AIR_TERRAIN_SHADOW
        if(isEyeInWater<2)
        #else
+       // above water, the light shafts come from the air light (AirTerrainShadow.inc)
        if(eyeInWater)
        #endif
          {

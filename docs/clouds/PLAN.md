@@ -17,6 +17,7 @@ Base du pack : SEUS PTGI HRR 2.1 GFME, Iris 1.11.7, Minecraft 26.3, Voxy.
 | 7 | Forme et éclairage des cumulus (retour : trop ronds, adoucis, blancs partout) : forme en chou-fleur, surface trouvée précisément, éclairage calibré sur une référence par path tracing, 2 bugs anciens corrigés | ✅ testée en jeu (« beaucoup mieux », assombrissement brusque sous la couche moyenne corrigé ensuite) |
 | 8 | Rayons crépusculaires : nouvelle carte d'ombre des nuages en espace lumière (2 cascades, ±80 km), ombre des nuages dans l'air intégrée avec l'atmosphère physique ; 8b : brume des vallées (milieu participant éclairé et ombré par les nuages) | 🧪 8 testée (rayons trop rares et trop faibles) → 8b testée (perte de FPS) → 8c testée (FPS en partie récupérés, bruit) → 8d à tester en jeu |
 | 9 | Audit performance, lot 1 : travail inutile supprimé sans changer l'image, bugs corrigés (voir la section Phase 9) | ✅ testé en jeu (+6 à 7 FPS, aucun bug, rendu stable) ; options de comparaison retirées, code définitif |
+| 10 | Audit, lot 2 : remplacements (faisceaux proches dans l'air, cache de GI, bloom, exposition), ombres lointaines et occlusion (voir la section Phase 10) | 🚧 en cours, comparable en jeu (écran *Comparaison du lot 2*) |
 
 La bibliothèque de nuages simulés (prévue en phase 7) est écartée : formes figées et répétitives (décision de l'utilisateur).
 
@@ -54,6 +55,30 @@ Référence : 50-60 FPS à l'arrêt, environ 45 en mouvement, sans nuages.
 
 - **Test 3** : le fantôme sur les surfaces proches est corrigé. Les reflets au centre de l'écran fonctionnent à
   l'arrêt mais traînaient pendant les rotations : corrigé par la reprojection (à confirmer).
+
+## Phase 10 : audit performance, lot 2
+
+Remplacements à risque moyen et ajouts visuels pour le relief lointain. Comme au lot 1, chaque partie a une option
+temporaire `AB_*` (écran *Comparaison du lot 2*), activée par défaut.
+
+| Partie | Option | Contenu | État |
+|---|---|---|---|
+| 2-A | `AB_AIR_SHAFTS` | R1 : faisceaux proches calculés avec la lumière de l'air | à tester |
+
+**2-A, faisceaux proches dans l'air** (`AirTerrainShadow.inc`, `Crepuscular.inc`, `composite4_c.csh`) :
+- Les anciens godrays (`composite4.fsh`) faisaient 32 pas sur 100 blocs pour chaque pixel interne, ciel compris,
+  avec 2 à 3 lectures par pas, et s'ajoutaient par-dessus la brume et la perspective aérienne. Ils ne restent que
+  sous l'eau, ou sans atmosphère physique ni nuages volumétriques.
+- L'intégration de l'air (`composite4_c`, un pixel sur quatre) commence maintenant par un segment proche de 8 pas
+  (répartition quadratique) jusqu'à `shadowDistance`. Dans ce segment, la carte d'ombre du soleil (vitraux
+  compris) ombre l'air et la brume des vallées : les vallées à l'ombre d'une crête restent sombres. Une brume
+  proche fine (`airMistSigma` × *Intensité des faisceaux proches*, sans extinction, phase HG 0,6 + isotrope,
+  estompée vers la fin de la carte d'ombre) diffuse la lumière du soleil. L'air réel est trop clair pour des
+  faisceaux visibles sur 100 blocs : la brume représente la poussière et l'humidité locales.
+- Calibrage hors jeu (sol plat, entièrement éclairé) : +5 % de lumière à midi, +14 % au coucher du soleil, jusqu'à
+  +50 % près du soleil. Les faisceaux naissent du contraste avec les zones à l'ombre du terrain.
+- Le segment lointain démarre après le segment proche : le terrain proche (moins de 240 blocs) n'a plus que les
+  8 pas proches au lieu de 12 à 24.
 
 ## Phase 9 : audit performance, lot 1
 
