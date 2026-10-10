@@ -7,8 +7,6 @@
 #ifndef GI_SAMPLING_INC
 #define GI_SAMPLING_INC
 
-const float giPi = 3.14159265359;
-
 // Blue noise of a pixel, moved along an irrational sequence every frame (64 frame cycle):
 // well spread in space and in time
 vec3 GiBlueNoise(ivec2 pixel) {

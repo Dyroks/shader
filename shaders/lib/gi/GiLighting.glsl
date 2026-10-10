@@ -9,14 +9,14 @@
 //     bounces), all times the surface colour,
 //  times the stained glass crossed by the ray.
 //
-//  Brightness scale: the constants match the original GI of the pack (deferred12 multiplies
-//  the GI by 10 and by the albedo of the pixel).
+//  Brightness scale: deferred12 multiplies the GI by 10 and by the albedo of the pixel.
 //
-//  Needs GiVolume.glsl, GiTrace.glsl, SkyShading or CloudSkyLookup, TintUnderwaterDepth,
-//  UnpackTwo16BitFrom32Bit, SHADOW_MAP_BIAS. Uniforms: shadowtex0, shadowcolor,
-//  shadowcolor1, shadowModelView, shadowProjection, colortex5 (light cache), colorSunlight,
-//  worldLightVector, worldSunVector, wetness, isEyeInWater, cameraPosition,
-//  cameraPosCenterDiff, altRTDiameter, viewWidth.
+//  Needs GiCommon.glsl, GiVolume.glsl, GiTrace.glsl, and SkyShading (Sky.inc) or
+//  CloudSkyLookup / CloudShadowLookup (CloudSky.inc with CLOUD_SKY_LOOKUPS).
+//  Uniforms: shadowtex0, shadowcolor, shadowcolor1, shadowModelView, shadowProjection,
+//  colortex5 (light cache), colorSunlight, worldLightVector, worldSunVector, wetness,
+//  isEyeInWater, eyeBrightnessSmooth, cameraPosition, cameraPosCenterDiff, altRTDiameter,
+//  viewWidth.
 // =====================================================================================
 
 #ifndef GI_LIGHTING_INC
@@ -34,13 +34,22 @@ vec3 GiShadowCoord(vec3 rel) {
 	return p.xyz;
 }
 
+// Light seen from under water: absorbed by the water above the camera
+vec3 GiUnderwaterTint(vec3 color) {
+	if (isEyeInWater > 0) {
+		float depth = 1.0 - float(eyeBrightnessSmooth.y) / 240.0;
+		color *= exp(-(vec3(0.25, 0.04, 0.01) + 0.03 * WATER_FOG_DENSITY) * depth * 8.0);
+	}
+	return color;
+}
+
 // Sunlight reaching a surface (camera relative position, normal), before its brightness
 vec3 GiSunAtHit(vec3 rel, vec3 normal) {
 	if (wetness > 0.99) return vec3(0.0);
 	vec3 sc = GiShadowCoord(rel);
 	sc.z -= pow(dot(rel, rel), 0.35) * 1e-5 + 4e-5;
 	float visibility = textureLod(shadowtex0, sc, 0.0);
-	vec3 sun = TintUnderwaterDepth(vec3(visibility * saturate(dot(worldLightVector, normal))));
+	vec3 sun = GiUnderwaterTint(vec3(visibility * giSat(dot(worldLightVector, normal))));
 	if (visibility < 0.1) return sun * (1.0 - wetness);
 	#ifdef GI_SUNLIGHT_STAINED_GLASS_TINT
 		float glass = textureLod(shadowtex0, vec3(sc.xy - vec2(0.5, 0.0), sc.z), 0.0);
@@ -72,21 +81,21 @@ vec3 GiSkyRadiance(vec3 dir) {
 	#else
 		vec3 sky = SkyShading(dir, worldSunVector);
 	#endif
-	sky *= saturate(dir.y * 10.0 + 1.0);
-	sky = TintUnderwaterDepth(sky);
-	return sky * (saturate(dir.y * 5.0) * 0.1);
+	sky *= giSat(dir.y * 10.0 + 1.0);
+	sky = GiUnderwaterTint(sky);
+	return sky * (giSat(dir.y * 5.0) * 0.1);
 }
 
 // Light reaching a voxel face from everywhere (light cache of the pack, colortex5: one cell
-// per block in a cube of altRTDiameter blocks around the camera, one cell per pixel)
+// per block in a cube of altRTDiameter blocks around the camera, one cell per pixel; colour
+// in the fractional part of y, z, w, gamma 1/8)
 vec3 GiCacheIrradiance(ivec3 voxel, vec3 normal) {
 	float size = float(altRTDiameter);
 	vec3 p = vec3(voxel) - giVolumeOffset + normal + cameraPosCenterDiff + 0.5 * size;
 	vec3 cell = floor(clamp(p, vec3(0.0), vec3(size - 1.0)).xzy + 1e-5);
 	float run = cell.x + cell.z * size;
 	ivec2 texel = ivec2(mod(run, viewWidth), cell.y + floor(run / viewWidth) * size);
-	vec4 data = texelFetch(colortex5, texel, 0);
-	vec3 irradiance = vec3(UnpackTwo16BitFrom32Bit(data.y).x, UnpackTwo16BitFrom32Bit(data.z).x, UnpackTwo16BitFrom32Bit(data.w).x);
+	vec3 irradiance = fract(texelFetch(colortex5, texel, 0).yzw) * (8192.0 / 8191.0);
 	return pow(irradiance, vec3(8.0));
 }
 

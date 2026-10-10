@@ -18,7 +18,7 @@ Base du pack : SEUS PTGI HRR 2.1 GFME, Iris 1.11.7, Minecraft 26.3, Voxy.
 | 8 | Rayons crépusculaires : nouvelle carte d'ombre des nuages en espace lumière (2 cascades, ±80 km), ombre des nuages dans l'air intégrée avec l'atmosphère physique ; 8b : brume des vallées (milieu participant éclairé et ombré par les nuages) | 🧪 8 testée (rayons trop rares et trop faibles) → 8b testée (perte de FPS) → 8c testée (FPS en partie récupérés, bruit) → 8d à tester en jeu |
 | 9 | Audit performance, lot 1 : travail inutile supprimé sans changer l'image, bugs corrigés (voir la section Phase 9) | ✅ testé en jeu (+6 à 7 FPS, aucun bug, rendu stable) ; options de comparaison retirées, code définitif |
 | 10 | Audit, lot 2 : remplacements (faisceaux proches dans l'air, cache de GI, bloom, exposition), ombres lointaines et occlusion (voir la section Phase 10) | ✅ faisceaux dans l'air et bloom définitifs, cache par moitié supprimé ; ombrage lointain encore en option (instable, réévalué en phase 11) |
-| 11 | GI maison : module `lib/gi`, sélecteur de méthode `GI_METHOD` (ReSTIR GI, plus tard Split RC), sortie progressive du code SEUS (voir la section Phase 11 et le [document de suivi](https://claude.ai/code/artifact/c02bd115-300a-45c4-a14d-a9edf9dd3978)) | 🧪 E0 et E1 à tester en jeu (option *Méthode de GI*) |
+| 11 | GI maison : module `lib/gi`, sélecteur de méthode `GI_METHOD` (ReSTIR GI, plus tard Split RC), sortie progressive du code SEUS (voir la section Phase 11 et le [document de suivi](https://claude.ai/code/artifact/c02bd115-300a-45c4-a14d-a9edf9dd3978)) | ✅ E0, E1 ; 🧪 E2 (ReSTIR GI) à tester en jeu |
 
 La bibliothèque de nuages simulés (prévue en phase 7) est écartée : formes figées et répétitives (décision de l'utilisateur).
 
@@ -92,6 +92,30 @@ lot 2*). Mesure GPU par passe : procédure dans le document de suivi (RenderDoc 
 - Option *Vue de débogage de la GI* (`GI_DEBUG_VIEW`) : lumière de la GI seule sur des surfaces blanches.
 - Nether et End : GI d'origine (`program/noSkyVariant`), non concernés pour l'instant.
 - La GI d'origine (`GI_METHOD` 0) est supprimée de `deferred.fsh` dès que la version maison est validée en jeu.
+
+**Retour du test d'E1** : le pack se lance, pas de problème. Décision de l'utilisateur : le rendu n'a pas à
+ressembler à SEUS (luminosité, couleurs, contraste) ; le but est de faire mieux, pas de reproduire SEUS.
+
+**E2, ReSTIR GI** (`lib/gi/GiRestir.glsl`, `GiReservoir.glsl`, `GiSurface.glsl`, `GiComputeHeader.glsl`,
+`deferred_a.csh`, `deferred_b.csh`) :
+- Le tracé passe en compute à la résolution interne, avant `deferred.fsh` (qui ne fait plus que recopier le
+  résultat `giRestirOut` dans le tampon de GI). Le module ne dépend plus de `Common.inc` (`GiCommon.glsl` :
+  `Ray`, empaquetage des normales, hachage PCG) ; `GiPathTrace.glsl` (version fragment d'E1) est supprimé.
+- `deferred_a` (temporel) : `GI_RAY_COUNT` candidats (rayons pondérés par le cosinus), fusionnés avec le réservoir
+  de la même surface à l'image précédente (reprojection, distance à ±10 %, normales à moins de 25°, historique
+  plafonné à `GI_RESTIR_HISTORY`). Un pixel sur quatre par image retrace son échantillon précédent : lumière
+  rafraîchie, échantillon abandonné si quelque chose le cache désormais.
+- `deferred_b` (spatial) : `GI_RESTIR_SPATIAL_SAMPLES` voisins dans un rayon de 24 pixels sur une surface
+  semblable, poids × jacobien de la reconnexion ; un échantillon pris à un voisin doit être visible depuis le pixel
+  (un rayon dans les voxels), sinon le pixel garde son propre réservoir. Ombrage : radiance × cos / π × W.
+- Fonction cible : luminance de la lumière de l'échantillon × cosinus. Ciel : échantillon placé à 10 000 blocs
+  dans la direction du rayon. Réservoirs : deux paires d'images `rgba32ui` (position, normales 8:8, radiance en
+  demi-flottants, M, W, distance de la surface), échangées à chaque image.
+- Option *ReSTIR GI : réutilisation* (`GI_RESTIR_REUSE`) : 0 nouveaux échantillons seulement (équivalent d'E1),
+  1 + images précédentes, 2 + voisins (défaut). Le débruiteur SEUS (accumulation temporelle et filtre à-trous) reste
+  en aval jusqu'à E3.
+- Coût attendu : environ +0,5 à 1,5 ms par rapport à E1 (rayon de revalidation sur un quart des pixels, rayon de
+  visibilité quand un voisin est choisi, lectures des réservoirs). Mémoire : environ 155 Mo en 4K.
 
 ## Phase 10 : audit performance, lot 2
 

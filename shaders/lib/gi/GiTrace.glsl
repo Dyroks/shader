@@ -180,7 +180,7 @@ GiHit GiTraceRay(vec3 origin, vec3 dir, int maxSteps) {
 			if (id == giIdLightBlock)
 				hit.emission = 0.1 * hit.albedo * GI_LIGHT_BLOCK_INTENSITY;
 			else if (id == giIdRedLight) {
-				float red = saturate(hit.albedo.r - (hit.albedo.g + hit.albedo.b) * 0.5 - 0.3);
+				float red = giSat(hit.albedo.r - (hit.albedo.g + hit.albedo.b) * 0.5 - 0.3);
 				hit.emission = 0.1 * hit.albedo * GI_LIGHT_BLOCK_INTENSITY * vec3(2.0, 0.35, 0.025) * step(1e-5, red);
 			}
 			break;

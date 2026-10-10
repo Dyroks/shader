@@ -267,9 +267,18 @@ value.SPEC_CHANNEL_EMISSIVE.3=a
 
 # RayTracing
 option.GI_METHOD=Méthode de GI
-option.GI_METHOD.comment=Calcul de la lumière indirecte (illumination globale). ReSTIR GI : module de GI maison du pack (un rebond tracé dans les voxels, rayons pondérés par le cosinus ; la réutilisation des échantillons entre pixels et entre images arrive aux étapes suivantes). SEUS : GI d'origine, gardée pour comparer jusqu'à la validation du module maison. Monde normal seulement pour l'instant
+option.GI_METHOD.comment=Calcul de la lumière indirecte (illumination globale). ReSTIR GI : module de GI maison du pack ; chaque pixel trace un rebond dans les voxels et réutilise la lumière trouvée par les images précédentes et par ses voisins (beaucoup moins de bruit pour le même nombre de rayons). SEUS : GI d'origine, gardée pour comparer jusqu'à la validation du module maison. Monde normal seulement pour l'instant
 value.GI_METHOD.0=SEUS (origine)
 value.GI_METHOD.1=ReSTIR GI
+option.GI_RESTIR_REUSE=ReSTIR GI : réutilisation
+option.GI_RESTIR_REUSE.comment=Échantillons de lumière réutilisés par chaque pixel. Nouveaux seulement : un rayon par pixel et par image, comme un path tracer simple. Images précédentes : aussi les échantillons gardés par la même surface sur les dernières images. Images et voisins : aussi les échantillons des pixels proches sur une surface semblable (un rayon de visibilité en plus). Pour comparer le bruit de chaque étape
+value.GI_RESTIR_REUSE.0=Nouveaux seulement
+value.GI_RESTIR_REUSE.1=Images précédentes
+value.GI_RESTIR_REUSE.2=Images et voisins
+option.GI_RESTIR_HISTORY=ReSTIR GI : historique
+option.GI_RESTIR_HISTORY.comment=Nombre d'images d'échantillons qu'un pixel garde. Plus : moins de bruit, mais réaction plus lente quand la lumière change (les échantillons sont aussi revérifiés toutes les 4 images)
+option.GI_RESTIR_SPATIAL_SAMPLES=ReSTIR GI : voisins
+option.GI_RESTIR_SPATIAL_SAMPLES.comment=Nombre de pixels voisins dont les échantillons sont réutilisés à chaque image. Plus : moins de bruit, un peu plus de coût
 option.GI_DEBUG_VIEW=Vue de débogage de la GI
 option.GI_DEBUG_VIEW.comment=Lumière de la GI seule : surfaces blanches, sans soleil ni lumière propre du bloc. Montre le bruit et la luminosité de la GI seule, pour comparer les méthodes
 value.GI_DEBUG_VIEW.0=Désactivée

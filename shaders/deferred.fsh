@@ -410,7 +410,8 @@ const float RAY_TRACING_RADIUS = RAY_TRACING_DIAMETER / 2.0;
    return Y;
  }
 #else
-#include "/lib/gi/GiPathTrace.glsl"
+// ReSTIR GI: computed by deferred_a.csh and deferred_b.csh (lib/gi/GiRestir.glsl)
+uniform sampler2D giRestirOutSampler;
 #endif
  void main()
  {
@@ -450,7 +451,7 @@ const float RAY_TRACING_RADIUS = RAY_TRACING_DIAMETER / 2.0;
        #if GI_METHOD == 0
        i=c(f.xyz,s.xyz,z,e,r,x,m.mcLightmap.y,m.parallaxOffset);
        #else
-       i=x.sky>.5?vec4(0.):GiPathTracePixel(f.xyz,z,e,r,m.mcLightmap.y,m.parallaxOffset,ivec2(Texcoord*ScreenSize));
+       i=x.sky>.5?vec4(0.):texelFetch(giRestirOutSampler,min(ivec2(Texcoord*ScreenSize),ivec2(ceil(ScreenSize*.5))-1),0);
        #endif
      }
    gl_FragData[0]=texture2DLod(colortex1,texcoord.xy,0);
