@@ -68,6 +68,7 @@ ces options et l'ancien code seront retirés une fois validés.
 | 1-A | `AB_GI_VOLUME` | O1, O2, O7, O11, V2 : GI et reflets limités au volume de voxels | à tester |
 | 1-B | `AB_SUN_SHADOW` | O3, O4, V3 : ombres du soleil | à tester |
 | 1-C | `AB_SURFACES` | O5, O6, S3, V4, V9 : surfaces du terrain et de l'eau | à tester |
+| 1-D | `AB_LOD_DISTANCE` | V1 : perspective aérienne du terrain Voxy à sa vraie distance | à tester |
 
 **1-A, GI dans le volume de voxels** (gain estimé 1,5 à 4 ms dans un panorama Voxy) :
 - O1 (`deferred.fsh`) : au-delà de `RAY_TRACING_RADIUS` (±167 blocs), `deferred12` remplace la GI par l'ambiance
@@ -114,6 +115,13 @@ qu'avec Parallaxe activée et un pack de textures avec relief) :
 
 Les programmes Voxy ne passent pas par `compile_check.py` : vérifiés avec un en-tête qui simule celui de Voxy
 (uniformes de `voxy.json`, structure `VoxyFragmentParameters`).
+
+**1-D, distance du terrain Voxy** (`composite4.fsh`, coût nul) :
+- V1 : pour le terrain Voxy solide, la profondeur vanilla vaut 1 : `LandAtmosphericScattering` recevait la distance
+  du plan lointain vanilla, donc le même voile pour toutes les montagnes. La position vient maintenant de la
+  profondeur Voxy, comme dans `CloudSurfaceDistance`. Changement visible voulu : les montagnes lointaines prennent
+  un voile qui grandit avec la distance (*Brume sur le relief lointain* pour le doser). Le brouillard sous l'eau
+  utilise aussi la vraie distance.
 
 ## Phase 8 : rayons crépusculaires
 

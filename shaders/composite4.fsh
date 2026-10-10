@@ -95,6 +95,12 @@ vec3 WorldPosToShadowProjPos(vec3 worldPos)
    {
      i=GetViewPosition(texcoord.xy,v.depth);
    }
+   #if defined LOD && defined AB_LOD_DISTANCE
+   // solid LOD terrain: its own position, not the far plane of the vanilla depth (aerial perspective,
+   // underwater fog)
+   if(!isWater&&v.depth>=1.0&&lodSolidDepth<1.0)
+     i=GetViewPositionLod(texcoord.xy,lodSolidDepth);
+   #endif
    vec4 m=gbufferModelViewInverse*vec4(i.xyz,0.);
    vec3 c=normalize(m.xyz),V=normalize((gbufferModelViewInverse*vec4(v.normal,0.)).xyz);
    float a=1.-v.smoothness,w=a*a;

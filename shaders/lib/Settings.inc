@@ -89,6 +89,7 @@
 #define AB_GI_VOLUME // Global illumination: no tracing outside the voxel volume (filled with the ambient light deferred12 uses there), rays stop when they leave the volume
 #define AB_SUN_SHADOW // Sun shadows: shadow tests skipped when the light cannot reach the surface, stained glass colour read only behind stained glass, ray traced shadow texture offset fixed
 #define AB_SURFACES // Terrain and water surfaces: early depth test kept with parallax, waves only on water, no wave relief where it is invisible, Voxy water fixes
+#define AB_LOD_DISTANCE // Voxy terrain: aerial perspective at its real distance instead of the far plane of the vanilla depth
 
 // Others
 // #define VISUALIZE_DANGEROUS_LIGHT_LEVEL
