@@ -15,7 +15,7 @@ Base du pack : SEUS PTGI HRR 2.1 GFME, Iris 1.11.7, Minecraft 26.3, Voxy.
 | 5 | Variété : couches moyennes et hautes (Ac, As, Ci, Cs, Cc), cumulonimbus et enclume, régimes météo, éclairs | ✅ testée en jeu (« très bon », pas de problème) |
 | 6 | Accélération (révisée après mesures : saut hiérarchique des zones vides), intérieur et nuages proches | ✅ testée en jeu (meilleures performances, intérieur des nuages bon) |
 | 7 | Forme et éclairage des cumulus (retour : trop ronds, adoucis, blancs partout) : forme en chou-fleur, surface trouvée précisément, éclairage calibré sur une référence par path tracing, 2 bugs anciens corrigés | ✅ testée en jeu (« beaucoup mieux », assombrissement brusque sous la couche moyenne corrigé ensuite) |
-| 8 | Rayons crépusculaires : nouvelle carte d'ombre des nuages en espace lumière (2 cascades, ±80 km), ombre des nuages dans l'air intégrée avec l'atmosphère physique ; 8b : brume des vallées (milieu participant éclairé et ombré par les nuages) | 🧪 8 testée (rayons trop rares et trop faibles) → 8b à tester en jeu |
+| 8 | Rayons crépusculaires : nouvelle carte d'ombre des nuages en espace lumière (2 cascades, ±80 km), ombre des nuages dans l'air intégrée avec l'atmosphère physique ; 8b : brume des vallées (milieu participant éclairé et ombré par les nuages) | 🧪 8 testée (rayons trop rares et trop faibles) → 8b testée (perte de FPS) → 8c (optimisation) à tester en jeu |
 
 La bibliothèque de nuages simulés (prévue en phase 7) est écartée : formes figées et répétitives (décision de l'utilisateur).
 
@@ -67,7 +67,7 @@ champ du soleil, derrière la caméra (anticrépusculaires), et autour des nuage
 
 | Élément | Implémentation |
 |---|---|
-| **Carte d'ombre** (`begin_h`, remplace l'ancienne) | « Beer shadow map » en espace lumière (technique d'Unreal Engine) : texels sur le plan normal à la lumière passant par la caméra, 2 cascades dans une image 1024×512 rgba16f (proche ±16 km, texels 62,5 m ; lointaine ±80 km, texels 312 m, rafraîchie une ligne sur deux par image). Chaque texel stocke l'entrée des nuages côté lumière, la sortie, leur profondeur optique, et celle des cirrus. Profondeur optique devant un point = linéaire entre l'entrée et la sortie. Marche de 150 km le long de la lumière avec des pas qui grandissent avec la distance (soleil rasant : les nuages lointains projettent les rayons du soir). Corrige aussi l'ancienne carte : ombres justes à toute altitude (sommets dans la couche de nuages), ombres portées jusqu'à l'horizon et jusqu'au coucher du soleil (l'ancienne s'éteignait sous 1,7°). |
+| **Carte d'ombre** (`begin_h`, remplace l'ancienne) | « Beer shadow map » en espace lumière (technique d'Unreal Engine) : texels sur le plan normal à la lumière passant par la caméra, 2 cascades dans une image 768×512 rgba16f (proche 256² sur ±8 km, texels 62,5 m — 512² sur ±16 km avant l'optimisation 8c ; lointaine 512² sur ±80 km, texels 312 m, rafraîchie une ligne sur deux par image). Chaque texel stocke l'entrée des nuages côté lumière, la sortie, leur profondeur optique, et celle des cirrus. Profondeur optique devant un point = linéaire entre l'entrée et la sortie. Marche de 150 km le long de la lumière avec des pas qui grandissent avec la distance (soleil rasant : les nuages lointains projettent les rayons du soir). Corrige aussi l'ancienne carte : ombres justes à toute altitude (sommets dans la couche de nuages), ombres portées jusqu'à l'horizon et jusqu'au coucher du soleil (l'ancienne s'éteignait sous 1,7°). |
 | **Intégration** (`lib/atmosphere/Crepuscular.inc`, `composite4`) | 24 pas (option) répartis quadratiquement jusqu'à 100 km (option) ou jusqu'au sommet de la couche de nuages, gigue stratifiée filtrée par le TAA. Lumière retirée devant les nuages, et derrière eux × leur transmittance. La lumière diffusée à travers les nuages fins éclaire encore l'air dessous (isotrope). La nuit : lune. Soustraction bornée sans changer la teinte. |
 | **Intensité** (`CREPUSCULAR_STRENGTH`, 150 %) | 100 % = physique (dépend de la brume, *Brume*). Au-delà, les faisceaux d'ombre sont plus sombres, mais jamais plus que de l'air sans lumière directe (pas de trous noirs). |
 | **Rayons du pack** | Les rayons proches (ombres du relief, carte d'ombre du pack) sont conservés, mais ajoutés après les nuages (avant, ils étaient atténués par les nuages situés derrière eux) ; leur lecture de l'ombre des nuages passe à une lecture unique par pas. |
@@ -97,6 +97,16 @@ brume dense limite la profondeur visible à quelques km : le motif des ombres re
 
 *Altitude de la brume* va de −2000 à 2000 (cartes qui descendent sous Y = 0) ; elle est calculée par rapport à la
 vraie altitude de la caméra (l'atmosphère, elle, ramène la caméra à son sol, Y = 63).
+
+### Optimisation 8c (retour : 50 → 40 FPS depuis les rayons et la brume)
+
+Mesures hors jeu (rapports seulement), puis trois corrections :
+
+| Cause | Correction |
+|---|---|
+| Rayons + brume intégrés pour **chaque pixel interne** dans `composite4` (24 pas), soit 4 × les pixels de la marche des nuages | Nouvelle passe `composite4_c` à la résolution de la marche (un pixel de chaque bloc 2×2, un différent à chaque image, comme `CLOUD_RES` 2), 2 images (`airLightA/B`). `composite4` suréchantillonne (4 voisins, poids bilinéaires × similarité de la distance de la surface) et n'intègre lui-même que les pixels sans voisin de profondeur proche (bords fins contre le ciel : < 1 % des pixels). Moins de pas sur les trajets courts (8 sous ~3 km). Coût de l'air ≈ ÷ 3. |
+| `CloudShadowLookup` (lumière du soleil sur le relief, **chaque impact de rayon de la GI** dans `deferred2`, réflexions) : la nouvelle carte faisait 4 lectures, 4 exponentielles et un logarithme au lieu d'une lecture filtrée | Sous la couche de nuages (cas du relief et de la GI), une seule lecture filtrée par le matériel (profondeur optique totale du texel), comme avant la phase 8. |
+| Carte d'ombre : la cascade proche (512²) traversait 5 à 8 km de champ de cumulus par texel en petits sauts (31 itérations sur 35 hors des nuages : le champ de distance est plafonné à ~0,7 km ; la carte de saut hiérarchique n'aide pas, ses tuiles contiennent presque toutes un nuage) | Cascade proche réduite à 256² (±8 km, même finesse de 62,5 m) ; au-delà, la cascade lointaine (312 m). Coût ≈ ÷ 1,7. |
 
 Réglages conseillés pour une carte de montagne : *Altitude de la brume* = fond des vallées, *Brume des vallées*
 Marquée ou Dense, *Épaisseur* 800 à 1000 m (elle monte sur les versants), *Intensité des rayons* 150 à 300 %.
@@ -264,7 +274,7 @@ composite4.fsh   composition             couleurs du soleil et du ciel, perspect
 
 - **Sous l'eau**, les nuages ne sont pas composés à l'écran (les réflexions et la GI les voient).
 - Les réflexions des nuages viennent de la capture 512² : elles sont un peu floues sur une eau très calme.
-- Les ombres des nuages couvrent environ ±16 km autour de la caméra (à l'échelle 1) et s'estompent quand le soleil est très bas.
+- Les ombres des nuages sont fines (texels de 62,5 m) jusqu'à ±8 km de la caméra (à l'échelle 1), puis plus douces (312 m) jusqu'à ±80 km.
 - Atmosphère SEUS (option 0) : la perspective atmosphérique suppose une caméra au sol ; les rayons vers le bas utilisent
   la direction miroir. Corrigé par l'atmosphère physique.
 - Atmosphère physique : `colorSunlight` est une approximation analytique (quelques % d'écart avec les tables) qui ignore
@@ -349,6 +359,7 @@ CLOUD_DUMP_WEATHER=dir python3 tools/cloud_preview.py out.png   # enregistre les
 PROF=1 python3 tools/cloud_preview.py out.png --frames 1   # itérations par catégorie (vide, grossier, fin, échantillons)
 python3 tools/cloud_preview.py out.png --yaw -32 --slice 1000 3500 1300 2300   # coupe verticale de la densité (+ paramètres météo)
 DUMP_LINEAR=img.npy python3 tools/cloud_preview.py out.png   # image linéaire + transmittance (.npy) pour mesurer les luminances
+python3 tools/cloud_preview.py out.png -D AIR_FULL_RES   # air bas intégré pour chaque pixel (référence du suréchantillonnage) ; -D AIR_DEBUG_FALLBACK : pixels intégrés en pleine résolution en rouge
 python3 tools/cloud_preview.py out.png -D AIR_DEBUG=1   # air bas : 1 = transmittance de la brume, 2 = lumière ajoutée, 3 = lumière retirée (avec DUMP_LINEAR : valeurs en unités du ciel)
 python3 tools/cloud_preview.py out.png -D CLOUD_LIGHT_RATIO=3.2   # define supplémentaire (constantes internes)
 python3 tools/cloud_reference.py render 250 256 ref250.npz   # référence path tracing (sphère de 250 m, 256 spp, ~3 min)

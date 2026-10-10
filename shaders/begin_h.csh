@@ -1,7 +1,7 @@
 #version 430
 
 // Volumetric clouds: cloud shadow map, begin_h. Light space "Beer shadow map", 2 cascades
-// (1024x512: near +-16 km, far +-80 km, scaled), see CloudSky.inc for the layout.
+// (768x512 atlas: near 256^2 +-8 km, far 512^2 +-80 km, scaled), see CloudSky.inc for the layout.
 // Read by the sunlight / GI / godrays / crepuscular rays code through CloudSky.inc.
 
 layout(local_size_x = 16, local_size_y = 16) in;
@@ -9,7 +9,7 @@ layout(local_size_x = 16, local_size_y = 16) in;
 #include "/lib/Settings.inc"
 
 #if defined VOLUMETRIC_CLOUDS && defined CLOUD_SHADOWS
-const ivec3 workGroups = ivec3(64, 32, 1);
+const ivec3 workGroups = ivec3(48, 32, 1);   // near: x < 16 and y < 16 groups, far: x >= 16
 #else
 const ivec3 workGroups = ivec3(1, 1, 1);
 #endif
@@ -26,7 +26,8 @@ layout(rgba16f) uniform writeonly image2D cloudShadow;
 void main() {
 	#if defined VOLUMETRIC_CLOUDS && defined CLOUD_SHADOWS
 		ivec2 id = ivec2(gl_GlobalInvocationID.xy);
-		bool far = id.x >= int(cloudShadowSize);
+		bool far = id.x >= int(cloudShadowNearSize);
+		if (!far && id.y >= int(cloudShadowNearSize)) return;
 		// the far cascade is refreshed every other frame (one row out of two): far shadows
 		// move slowly, the stale rows are at most one frame old
 		if (far && ((id.y ^ frameCounter) & 1) != 0) return;
@@ -38,7 +39,8 @@ void main() {
 			vec3 U, V;
 			CloudShadowBasis(L, U, V);
 			float texel = far ? cloudShadowTexelFar : cloudShadowTexelNear;
-			vec2 uv = CloudShadowGridOffset(U, V, texel) + (vec2(id.x & (int(cloudShadowSize) - 1), id.y) + 0.5 - cloudShadowSize * 0.5) * texel;
+			float size = far ? cloudShadowFarSize : cloudShadowNearSize;
+			vec2 uv = CloudShadowGridOffset(U, V, texel) + (vec2(far ? id.x - int(cloudShadowNearSize) : id.x, id.y) + 0.5 - size * 0.5) * texel;
 			vec3 q = U * uv.x + V * uv.y;   // texel centre on the plane through the camera, normal to L
 			float camY = cameraPosition.y;
 

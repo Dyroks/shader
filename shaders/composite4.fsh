@@ -31,6 +31,7 @@ flat in vec3 cloudSkyAmbient;
 #include "/lib/clouds/CloudLookups.inc"
 #include "/lib/clouds/CloudComposite.inc"
 #if ATMOSPHERE_MODEL == 1
+#define AIR_LIGHT_UPSAMPLE
 #include "/lib/atmosphere/Crepuscular.inc"
 #endif
 #endif
@@ -214,7 +215,12 @@ vec3 WorldPosToShadowProjPos(vec3 worldPos)
        #ifdef AIR_LIGHT_ACTIVE
        // crepuscular rays (the light the air in the shadow of the clouds does not scatter) and
        // the haze layer
-       AirLight air=AirLightIntegrate(c.xyz,CloudSurfaceDistance(texcoord.xy),cloudTD,BlueNoiseTemporal(texcoord.xy),cloudSkyAmbient,pow(saturate(eyeBrightnessSmooth.y/240.),6.));
+       // computed at low resolution by composite4_c, integrated here only where the upsampling
+       // finds no sample of a similar surface
+       float airDist=CloudSurfaceDistance(texcoord.xy);
+       AirLight air;
+       if(!AirLightUpsample(ivec2(texcoord.xy*vec2(viewWidth,viewHeight)),airDist,air))
+         air=AirLightIntegrate(c.xyz,airDist,cloudTD,BlueNoiseTemporal(texcoord.xy),cloudSkyAmbient,pow(saturate(eyeBrightnessSmooth.y/240.),6.));
        U=AirLightApply(U,air,cloudToComposite);
        #endif
      }

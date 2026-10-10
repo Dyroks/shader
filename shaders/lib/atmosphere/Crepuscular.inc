@@ -117,7 +117,8 @@ AirLight AirLightIntegrate(vec3 dir, float dist, vec2 cloudTD, vec3 noise, vec3 
 
 	// quadratic distribution (shafts close to the camera are the largest on screen), one jitter
 	// for all the steps (stratified), filtered by the temporal anti-aliasing
-	const int N = CREPUSCULAR_STEPS;
+	// fewer steps over short segments (close terrain): 8 below ~3 km, all of them from 30 km
+	int N = clamp(int(ceil(float(CREPUSCULAR_STEPS) * sqrt((t1 - t0) * atmoKmPerBlock / 30.0))), min(8, CREPUSCULAR_STEPS), CREPUSCULAR_STEPS);
 	for (int i = 0; i < N; i++) {
 		float a0 = float(i) / float(N), a1 = float(i + 1) / float(N);
 		float ta = t0 + (t1 - t0) * a0 * a0, tb = t0 + (t1 - t0) * a1 * a1;
@@ -200,6 +201,49 @@ vec3 CrepuscularApply(vec3 color, vec3 shadowed) {
 	vec3 r = color * 0.95 / max(shadowed, vec3(1e-9));
 	return color - shadowed * min(1.0, min(r.r, min(r.g, r.b)));
 }
+
+#ifdef AIR_LIGHT_UPSAMPLE
+uniform sampler2D airLightASampler;
+uniform sampler2D airLightBSampler;
+
+// Light in the air of an internal pixel from the low resolution pass (composite4_c, one pixel
+// of each 2x2 block, a different one every frame): the 4 nearest samples, bilinear weights
+// times the similarity of their surface distance. Returns false when no sample sees a similar
+// surface (thin objects against the sky, edges): integrate the pixel itself then.
+bool AirLightUpsample(ivec2 px, float dist, out AirLight a) {
+	int i = frameCounter & 3;
+	ivec2 off = ivec2(i == 1 || i == 2 ? 1 : 0, i == 1 || i == 3 ? 1 : 0);   // CloudCheckerOffset
+	ivec2 rsz = (ivec2(ceil(vec2(viewWidth, viewHeight) * 0.5)) + 1) / 2;
+	vec2 f = vec2(px - off) * 0.5;
+	ivec2 b = ivec2(floor(f));
+	vec2 fr = f - vec2(b);
+	float dKm = min(dist * 0.001, 60000.0);
+	vec4 sumA = vec4(0.0);
+	vec3 sumB = vec3(0.0);
+	float sumW = 0.0, best = 1e9;
+	for (int k = 0; k < 4; k++) {
+		ivec2 o = ivec2(k & 1, k >> 1);
+		ivec2 q = clamp(b + o, ivec2(0), rsz - 1);
+		vec4 A = texelFetch(airLightASampler, q, 0);
+		vec4 B = texelFetch(airLightBSampler, q, 0);
+		float rel = abs(B.w - dKm) / max(min(B.w, dKm), 0.02);
+		best = min(best, rel);
+		vec2 bw = mix(1.0 - fr, fr, vec2(o));
+		float w = bw.x * bw.y * exp2(-rel * 20.0) + 1e-6;
+		sumA += A * w;
+		sumB += B.rgb * w;
+		sumW += w;
+	}
+	a.removed = sumA.rgb / sumW;
+	a.inscatter = sumB / sumW;
+	#ifdef HAZE_ACTIVE
+		a.T = exp(-(sumA.w / sumW) * hazeSpectral);
+	#else
+		a.T = vec3(1.0);
+	#endif
+	return best < 0.15;
+}
+#endif
 
 // The whole lower air on a colour in composite4 units (unit: sky units -> composite units)
 vec3 AirLightApply(vec3 color, AirLight a, float unit) {

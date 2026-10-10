@@ -125,6 +125,7 @@ vec3 SkyAmbient() {
 #include "/lib/clouds/CloudLookups.inc"
 #include "/lib/clouds/CloudComposite.inc"
 #if ATMOSPHERE_MODEL == 1
+#define AIR_LIGHT_UPSAMPLE
 #include "/lib/atmosphere/Crepuscular.inc"
 #endif
 uniform sampler2D noisetex;
@@ -168,8 +169,18 @@ void main() {
 	CloudComposite(U, dir, tc, skyAmb, cloudTD);
 	#ifdef AIR_LIGHT_ACTIVE
 		vec3 nz = fract(texelFetch(noisetex, px & 63, 0).rgb + vec3(0.447213595, 1.41421356, 1.61803398) * float(frameCounter % 64));
-		AirLight air = AirLightIntegrate(dir, CloudSurfaceDistance(tc), cloudTD, nz, skyAmb, 1.0);
+		AirLight air;
+		float airDist = CloudSurfaceDistance(tc);
+		#ifdef AIR_FULL_RES
+			bool up = false;
+		#else
+			bool up = AirLightUpsample(px, airDist, air);
+		#endif
+		if (!up) air = AirLightIntegrate(dir, airDist, cloudTD, nz, skyAmb, 1.0);
 		U = AirLightApply(U, air, cloudToComposite);
+		#ifdef AIR_DEBUG_FALLBACK   // pixels integrated at full resolution in red
+			if (!up) U = vec3(100.0, 0.0, 0.0);
+		#endif
 		#ifdef AIR_DEBUG   // 1: haze transmittance, 2: haze in-scattering, 3: light removed from the air
 			U = (AIR_DEBUG == 1 ? air.T : AIR_DEBUG == 2 ? air.inscatter : air.removed) * 120.0;
 		#endif
@@ -178,7 +189,7 @@ void main() {
 		vec2 uv = tc / vec2(0.5 * viewHeight / viewWidth, 0.5) / 0.4;   // square inset, bottom left
 		if (uv.x < 1.0 && uv.y < 1.0) U = textureLod(cloudSkyCaptureSampler, uv, 0.0).rgb * 0.12;
 		vec2 uv2 = (tc - vec2(0.5 - 0.2 * viewHeight / viewWidth, 0.0)) / vec2(0.5 * viewHeight / viewWidth, 0.5) / 0.4;
-		if (uv2.x > 0.0 && uv2.x < 1.0 && uv2.y < 1.0) U = vec3(exp(-textureLod(cloudShadowSampler, uv2 * vec2(0.5, 1.0), 0.0).z)) * 2.0;
+		if (uv2.x > 0.0 && uv2.x < 1.0 && uv2.y < 1.0) U = vec3(exp(-textureLod(cloudShadowSampler, uv2 * vec2(512.0 / 768.0, 1.0) + vec2(256.0 / 768.0, 0.0), 0.0).z)) * 2.0;
 	}
 	imageStore(outImg, px, vec4(U / 120.0, 1.0));
 }
@@ -329,8 +340,8 @@ def main():
     regime.filter = (moderngl.LINEAR, moderngl.LINEAR)
     skipMap = ctx.texture((256, 336), 4, dtype="f2")
     skipMap.filter = (moderngl.NEAREST, moderngl.NEAREST)
-    shadowMap = ctx.texture((1024, 512), 4, dtype="f2")
-    shadowMap.filter = (moderngl.NEAREST, moderngl.NEAREST)
+    shadowMap = ctx.texture((768, 512), 4, dtype="f2")
+    shadowMap.filter = (moderngl.LINEAR, moderngl.LINEAR)   # as Iris images (texelFetch ignores it)
     capture = ctx.texture((512, 512), 4, dtype="f2")
     capture.filter = (moderngl.LINEAR, moderngl.LINEAR)
     wNear = img3d(2048, 2048, 2)
@@ -339,6 +350,8 @@ def main():
     histA = ctx.texture((W, H), 4, dtype="f2")
     histB = ctx.texture((W, H), 4, dtype="f2")
     out = ctx.texture((W, H), 4, dtype="f4")
+    airA = ctx.texture(((W + 1) // 2 + 1, (H + 1) // 2 + 1), 4, dtype="f2")
+    airB = ctx.texture(((W + 1) // 2 + 1, (H + 1) // 2 + 1), 4, dtype="f2")
 
     # ---- camera / scene --------------------------------------------------------------
     cam = (args.cam_x, args.cam_y, args.cam_z)
@@ -383,6 +396,10 @@ def main():
     pShadow, pCapture = program("begin_h.csh"), program("begin_g.csh")
     pSkip = program("begin_c.csh")
     pAtmoT, pAtmoMS, pAtmoSV = program("begin_d.csh"), program("begin_e.csh"), program("begin_f.csh")
+    # the second image of composite4_c needs its own unit (moderngl cannot rebind image uniforms)
+    air_src = open(os.path.join(SHADERS, "composite4_c.csh")).read().replace(
+        "layout(rgba16f) uniform writeonly image2D airLightB", "layout(rgba16f, binding = 1) uniform writeonly image2D airLightB")
+    pAir = ctx.compute_shader(build_source(air_src, overrides, extra, is_text=True))
     disp_src = DISPLAY_SHADER.replace("%SEUS%", seus_sky_functions())
     pDisp = ctx.compute_shader(build_source(disp_src, overrides, extra, is_text=True))
 
@@ -390,7 +407,8 @@ def main():
              "depthtex0": depthtex, "cloudRegimeSampler": regime, "cloudWeatherNearSampler": wNear, "cloudWeatherFarSampler": wFar,
              "cloudRawSampler": raw, "cloudHistASampler": histA, "cloudHistBSampler": histB,
              "cloudShadowSampler": shadowMap, "cloudSkipSampler": skipMap, "cloudSkyCaptureSampler": capture,
-             "atmoTransmittanceSampler": atmoT, "atmoMultiScatSampler": atmoMS, "atmoSkyViewSampler": atmoSV}
+             "atmoTransmittanceSampler": atmoT, "atmoMultiScatSampler": atmoMS, "atmoSkyViewSampler": atmoSV,
+             "airLightASampler": airA, "airLightBSampler": airB}
 
     def common_uniforms(p, frame):
         set_u(p, "cameraPosition", cam)
@@ -414,6 +432,7 @@ def main():
         set_u(p, "timeMidnight", float(np.clip(-sun[1] * 10, 0, 1)))
         set_u(p, "nightVision", 0.0)
         set_u(p, "groundY", args.ground)
+        set_u(p, "eyeBrightnessSmooth", (240, 240))
         for i, (name, tex) in enumerate(units.items()):
             try:
                 p[name].value = i
@@ -481,10 +500,10 @@ def main():
     # cloud shadow map, sky capture (4 frames to fill every texel of the checkerboard)
     common_uniforms(pShadow, 0)
     shadowMap.bind_to_image(0, read=False, write=True)
-    run(pShadow, 64, 32)
+    run(pShadow, 48, 32)
     if os.environ.get("CLOUD_TIMING"):  # second dispatch: the first one includes the compilation
         import time as _t
-        ctx.finish(); _t0 = _t.perf_counter(); run(pShadow, 64, 32); ctx.finish()
+        ctx.finish(); _t0 = _t.perf_counter(); run(pShadow, 48, 32); ctx.finish()
         print(f"shadow map time: {(_t.perf_counter() - _t0) * 1000:.0f} ms")
     for f in range(4):
         common_uniforms(pCapture, f)
@@ -522,8 +541,21 @@ def main():
     # the display adds the crepuscular rays (stochastic): averaged over the frames
     img = np.zeros((H, W, 3))
     disp_time = 0.0
+    air_time = 0.0
     for f in range(args.frames):
-        set_u(pDisp, "frameCounter", 2 * f)   # even: the cloud history is read from cloudHistA
+        # light in the lower air at the ray march resolution (composite4_c), then the display
+        common_uniforms(pAir, 2 * f)   # even: the cloud history is read from cloudHistA
+        airA.bind_to_image(0, read=False, write=True)
+        airB.bind_to_image(1, read=False, write=True)
+        ctx.finish(); t0 = time.perf_counter()
+        run(pAir, ((W + 1) // 2 + 7) // 8, ((H + 1) // 2 + 7) // 8)
+        ctx.finish()
+        if f > 0: air_time += time.perf_counter() - t0
+        common_uniforms(pDisp, 0)
+        if args.frame_time is not None:
+            set_u(pDisp, "frameTimeCounter", args.frame_time)
+        set_u(pDisp, "showCapture", 1 if args.show_capture else 0)
+        set_u(pDisp, "frameCounter", 2 * f)
         out.bind_to_image(0, read=False, write=True)
         ctx.finish(); t0 = time.perf_counter()
         run(pDisp, (W + 7) // 8, (H + 7) // 8)
@@ -557,7 +589,8 @@ def main():
     if overrides.get("CLOUD_DEBUG_VIEW") == "3":
         print(f"ray march cost: mean {acc[..., 1].mean():.4f} p95 {np.percentile(acc[..., 1], 95):.4f} (fraction of CQ_STEPS * 3 iterations)")
     if os.environ.get("CLOUD_TIMING"):
-        print(f"display (composition, crepuscular rays) time per frame: {disp_time / max(args.frames - 1, 1) * 1000:.0f} ms")
+        print(f"air light (composite4_c) time per frame: {air_time / max(args.frames - 1, 1) * 1000:.0f} ms")
+        print(f"display (composition, air light upsampling) time per frame: {disp_time / max(args.frames - 1, 1) * 1000:.0f} ms")
         print(f"march time per frame: {march_time / max(args.frames - 1, 1) * 1000:.0f} ms (CPU renderer: only ratios are meaningful)")
     print(f"saved {args.out}  cloud cover (1-T mean): {1 - t.mean():.3f}  exposure key {key:.4g}")
 
